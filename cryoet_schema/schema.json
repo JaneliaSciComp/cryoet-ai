@@ -872,18 +872,6 @@
           "default": null,
           "title": "Voxel Bin"
         },
-        "voxel_spacing_angstrom": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Voxel Spacing Angstrom"
-        },
         "derived_from": {
           "items": {
             "type": "string"

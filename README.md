@@ -62,7 +62,7 @@ The directory skeleton is adapted from the [CZI CryoET Data Portal](https://chan
 
 - **Two metadata files per sample.** Sample-level conditions live in `sample.toml` at the sample root. Per-acquisition parameters and the processing log live in `{acquisition}/acquisition.toml`. Fields derivable from MDOC files and file headers are authored in neither file; the ingest pipeline will read them directly.
 - **Tomograms are kept in per-pipeline subfolders** (e.g., `bp_3dctf_bin4/`, `bp_3dctf_bin4_ddw/`) rather than flattened into `Tomograms/`. This avoids filename collisions when new processing versions are added, and the folder name acts as the `processing_id`.
-- **No `VoxelSpacing{N}/` subfolder.** Voxel spacing is recorded directly in `acquisition.toml` (as `voxel_bin` and `voxel_spacing_angstrom` on each `[[tomogram]]` entry) and cross-checked against the MRC header. Keeping it out of the path avoids duplicating information that lives in the file itself.
+- **No `VoxelSpacing{N}/` subfolder.** Voxel binning is recorded directly in `acquisition.toml` (as `voxel_bin` on each `[[tomogram]]` entry); the absolute voxel spacing in Ångström is read from the MRC header by the catalog scanner. Keeping voxel info out of the path avoids duplicating information that lives in the file itself.
 
 Simulation data uses a parallel structure with domain-appropriate folder names. Both share the same schema, which is what makes cross-comparison possible.
 
@@ -142,14 +142,12 @@ Each Pydantic model is configured with `extra="allow"`, so unknown keys are pres
 [[tomogram]]
 id                     = "bp_3dctf_bin4"
 voxel_bin              = 4
-voxel_spacing_angstrom = 10.0
 derived_from           = []
 
 # Denoised version derived from the raw
 [[tomogram]]
 id                     = "bp_3dctf_bin4_ddw"
 voxel_bin              = 4
-voxel_spacing_angstrom = 10.0
 derived_from           = ["bp_3dctf_bin4"]
 
 # Segmentation run on the denoised tomogram

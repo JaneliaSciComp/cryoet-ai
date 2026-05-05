@@ -143,7 +143,8 @@ One row per tomogram output. Primary key: `(sample_id, acquisition_id, tomogram_
 | `pipeline` | text | `acquisition.toml` (`[[tomogram]]`) | Human description. [researcher: Processing Steps] |
 | `software` | text | `acquisition.toml` (`[[tomogram]]`) | [researcher: software] |
 | `voxel_bin` | integer | `acquisition.toml` (`[[tomogram]]`) | |
-| `voxel_spacing_angstrom` | float | `acquisition.toml` (`[[tomogram]]`) ↔ cross-checked with `MRC header` | [researcher: voxel size] |
+| `voxel_spacing_angstrom` | float | `MRC header` | DB-only column populated by the catalog scanner from the MRC header's `voxel_size.x`; not authored in any TOML. |
+| `voxel_spacing_angstrom_implied` | float | `derived` | DB-only column: `pixel_size × voxel_bin` when both are available, NULL otherwise. Exists for queryability of cross-source disagreements. |
 | `derived_from` | list[text] | `acquisition.toml` (`[[tomogram]]`) | Lineage; empty for raw reconstructions. |
 | `is_raw` | boolean | `derived` | `derived_from == []`. [researcher: Raw tomogram flag] |
 | `image_size_x` | integer | `MRC header` | [researcher: image size] |

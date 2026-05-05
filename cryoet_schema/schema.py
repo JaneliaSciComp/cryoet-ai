@@ -217,7 +217,6 @@ class Tomogram(_Base):
     pipeline: str | None = None
     software: str | None = None
     voxel_bin: int | None = None
-    voxel_spacing_angstrom: float | None = None      # cross-checked with MRC header
     derived_from: list[IdStr] = Field(default_factory=list)
     # derived
     is_raw: bool | None = None                        # derived_from == []

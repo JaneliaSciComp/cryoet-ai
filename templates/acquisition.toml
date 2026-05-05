@@ -54,7 +54,6 @@
 # pipeline               = "<FILL IN>"   # e.g. "backprojection + 3D CTF correction"
 # software               = "<FILL IN>"   # e.g. "IMOD 4.12 + novaCTF"
 # voxel_bin              = "<FILL IN>"   # integer, e.g. 4
-# voxel_spacing_angstrom = "<FILL IN>"   # float, e.g. 10.0
 # derived_from           = "<FILL IN>"   # list of tomogram ids in this acquisition; empty for raw reconstructions
 
 # [[annotation]]
