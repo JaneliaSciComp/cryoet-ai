@@ -14,8 +14,9 @@ The central design goal is answering one question across both the experimental a
 | `cryoet_schema/acquisition.schema.json` | JSON Schema for a single `acquisition.toml` on its own (the `AcquisitionFile` model), generated from `schema.py`. Used by `acquisition.toml`'s `#:schema` directive so editors can validate it without requiring the sample-level fields. |
 | `cryoet_schema/validate.py` | Validator: `pixi run validate {sample_dir}`. |
 | `cryoet_schema/generate_json_schema.py` | Regenerates both `schema.json` and `acquisition.schema.json` from the Pydantic models: `pixi run json-schema`. |
-| `templates/sample.toml` | Starter template for `sample.toml` — copy into each sample directory and fill in. |
-| `templates/acquisition.toml` | Starter template for `acquisition.toml` — copy into each acquisition directory and fill in. |
+| `templates/sample_name` | Starter directory structure containing `sample.toml` and `acquistion.toml`. Copy this directory to start a new sample. |
+| `templates/sample.toml` | Starter template for `sample.toml`. If you didn't start a new sample from the starter directory `sample_name/`, copy this template into your sample directory and fill in. |
+| `templates/acquisition.toml` | Starter template for `acquisition.toml`. If you didn't start a new sample from the starter directory `sample_name/`, copy this template into each acquisition directory and fill in. |
 | `pixi.toml` / `pixi.lock` | Pinned default and testing environments, with pixi tasks defined for each.  |
 
 ---
@@ -83,20 +84,6 @@ One file per acquisition, placed at the root of each acquisition directory. It c
 2. A **processing log**: `[[tomogram]]` and `[[annotation]]` entries appended over time as processing produces new outputs.
 
 The acquisition directory name *is* the acquisition's identity, so `acquisition.id` is omitted from the file.
-
-### What the ingest pipeline will derive automatically
-
-Researchers do **not** enter these fields in `acquisition.toml`:
-
-| Source | Fields derived |
-|---|---|
-| `.mdoc` files | pixel size, tilt angles (min/max), tilt dose per tilt, total dose, defocus per image, date/time, voltage, energy filter slit width |
-| Frame file extension (`.eer` vs `.tiff`) | camera type (Falcon vs K3) |
-| MRC headers | voxel size, grid dimensions |
-| OME-Zarr `.zattrs` | axis order, scale |
-| Sample directory name | sample identity |
-| Acquisition directory name | acquisition identity |
-| Tomogram / annotation folder names | path to each output |
 
 ---
 
@@ -170,13 +157,15 @@ Skipping the editor setup is fine — `pixi run validate {sample_dir}` (step 5) 
 
 ### 1. Lay out the sample directory
 
-Create a directory named after the sample. The directory name *is* the sample's identity and will be used by the ingest pipeline.
+Copy the starter directory, `scratch/templates/sample_name/` into the `data/` directory. The starter directory contains empty directories to scaffold the correct directory structure. Then following the naming instructions below.
+
+Replace `sample_name` with the desired sample id.
 
 ```
 gouauxlab_20250418_AMmilled29-2/
 ```
 
-Inside, create one subdirectory per acquisition. Each acquisition directory name is also its identity.
+Inside, make a copy of `acquistion_name`. Then update one of the directories to the desired acquistion id for your first acquisition. Repeat this process every time you want to add a new acquisition.
 
 ```
 gouauxlab_20250418_AMmilled29-2/
@@ -184,30 +173,29 @@ gouauxlab_20250418_AMmilled29-2/
   Position_87/
 ```
 
-### 2. Fill out `sample.toml`
-
-Copy `templates/sample.toml` to the sample root and fill it in:
+### 2. Fill out `sample_name/sample.toml`
 
 - Complete as many fields marked `<FILL IN>` as you can. For now, the only required fields are `sample.data_source` and `sample.project`.
 - Delete the `[synapse]` block if your project is `chromatin`, or vice versa.
 - Optionally, uncomment and complete the [[aunp]], [freezing], and [milling] blocks.
 
-### 3. Fill out `acquisition.toml` in each acquisition directory
+### 3. Fill out `sample_name/acquistion_name/acquisition.toml` in each acquisition directory
 
-Copy `templates/acquisition.toml` into each acquisition directory and fill in the researcher-authored imaging parameters (nominal resolution, microscope, defocus range, …).
+- Complete as many fields marked `<FILL IN>` as you can. For now, no fields are required.
 
 ### 4. Append to the processing log as outputs are produced
 
 Each `acquisition.toml` grows over time. For each new output — a new tomogram reconstruction, a denoised version, a segmentation, an STA result — append a new `[[tomogram]]` or `[[annotation]]` entry to the relevant acquisition's file.
 
 **Rules:**
-- Entries are immutable once added. Reprocessing produces a **new** entry with a new `id`, not a modification of an existing one.
-- The `id` must match the folder name under `Reconstructions/Tomograms/` or `Reconstructions/Annotations/`.
+- Do **not** delete or modify a tomogram or annotation entry once added. Reprocessing produces a **new** entry with a new `id`, placed at the bottom of the file.
+- The `id` must match one folder name under either `Reconstructions/Tomograms/` or `Reconstructions/Annotations/`.
 - Use `derived_from` and `target_tomogram` to record lineage (see above).
 
-Because each acquisition has its own file, appends are strictly tail-append and parallel work on different acquisitions never causes merge conflicts.
-
 ### 5. Validate
+
+> [!NOTE]
+> You must [install pixi](https://pixi.prefix.dev/latest/installation/) to run the validation. Then, the first time you use pixi for this repo, you will need to run `pixi install` to install the environment.
 
 ```
 pixi run validate {sample_dir}
