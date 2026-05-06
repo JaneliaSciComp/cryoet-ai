@@ -1,4 +1,4 @@
-#:schema ../cryoet_schema/schema.json
+#:schema file:///groups/cryoet/cryoet/data/scratch/cryoet_schema/schema.json
 # sample.toml — researcher-authored sample-level metadata.
 # One file per sample, placed at the root of the sample directory.
 # The sample directory name IS the sample's identity — not repeated here.
