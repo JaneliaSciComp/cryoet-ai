@@ -11,6 +11,10 @@ data
 # database files
 *.db
 
+# Claude, except for plans
+.claude/*
+!.claude/plans/
+
 
 node_modules
 dist
