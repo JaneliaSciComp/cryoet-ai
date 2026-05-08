@@ -1,0 +1,12 @@
+[acquisition]
+resolution = 3.5
+microscope = "Krios"
+
+[[tomogram]]
+id = "bp_3dctf_bin4"
+voxel_bin = 4
+
+[[annotation]]
+id = "membrain_seg_v10"
+type = "membrane_segmentation"
+target_tomogram = "bp_3dctf_bin4"

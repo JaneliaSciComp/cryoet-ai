@@ -1,0 +1,6 @@
+[sample]
+data_source = "simulation"
+project = "chromatin"
+
+[simulation]
+dataset_type = "single_molecule"

@@ -1,0 +1,4 @@
+[sample]
+data_source = "cryoet"
+project = "chromatin"
+description = "fixture chromatin sample"

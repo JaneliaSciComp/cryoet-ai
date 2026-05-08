@@ -1,0 +1,1 @@
+{"multiscales": [{"axes": [{"name": "z"}, {"name": "y"}, {"name": "x"}], "datasets": [{"path": "0", "coordinateTransformations": [{"type": "scale", "scale": [11.72, 11.72, 11.72]}]}]}]}

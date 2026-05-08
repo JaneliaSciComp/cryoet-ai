@@ -7,19 +7,35 @@ version = "0.1.0"
 
 [environments]
 default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+test    = { features = ["test"],                          solve-group = "default" }
+catalog = { features = ["catalog", "test"],               solve-group = "default" }
+api     = { features = ["catalog", "api", "test"],        solve-group = "default" }
 
 [dependencies]
-python = ">=3.11"
-pydantic = ">=2.6"
+python    = ">=3.11"
+pydantic  = ">=2.6"
 rapidfuzz = ">=3.0"
 
 [tasks]
-validate = "python -m scripts.validate"
-json-schema = "python -m scripts.generate_json_schema"
+validate    = "python -m cryoet_schema.validate"
+json-schema = "python -m cryoet_schema.generate_json_schema"
 
 [feature.test.dependencies]
 pytest = ">=7.0"
 
 [feature.test.tasks]
 test = "pytest"
+
+[feature.catalog.dependencies]
+sqlalchemy = ">=2.0"
+mrcfile    = ">=1.5"
+
+[feature.catalog.tasks]
+scan = "python -m cryoet_catalog scan"
+
+[feature.api.dependencies]
+fastapi = ">=0.110"
+uvicorn = "*"
+
+[feature.api.tasks]
+api      = "uvicorn cryoet_catalog.api.main:app --reload --port 8000"

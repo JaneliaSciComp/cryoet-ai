@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cryoet-schema"
+version = "0.1.0"
+description = "Pydantic schema, validator CLI, and catalog scanner for CryoET + AI sample metadata."
+requires-python = ">=3.11"
+authors = [{ name = "allison-truhlar", email = "truhlara@janelia.hhmi.org" }]
+dependencies = [
+    "pydantic>=2.6",
+    "rapidfuzz>=3.0",
+]
+
+[project.optional-dependencies]
+catalog = [
+    "sqlalchemy>=2.0",
+    "mrcfile>=1.5",
+]
+api = [
+    "cryoet-schema[catalog]",
+    "fastapi>=0.110",
+    "uvicorn[standard]",
+]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+cryoet-validate = "cryoet_schema.validate:main"
+cryoet-json-schema = "cryoet_schema.generate_json_schema:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cryoet_schema*", "cryoet_catalog*"]
+exclude = ["tests*", "templates*", "scripts*", "frontend*"]
