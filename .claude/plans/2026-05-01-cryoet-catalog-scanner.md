@@ -124,9 +124,20 @@ No `src/` layout — match the existing flat convention used by `cryoet_schema/`
         extras.py            # GET /extras/summary
         warnings.py          # GET /samples/{sample_id}/warnings
 
-  frontend/                  # NEW — React app (Vite + TypeScript); separate package.json
+  frontend/                  # NEW — React app (Vite + TypeScript + TanStack Start + Material UI + TanStack Query); separate package.json
     package.json
+    vite.config.ts           # tanstackStart plugin + viteReact + /api proxy + host:true
+    tsconfig.json            # ~/* path alias → ./src/*
     src/
+      router.tsx             # getRouter(): per-request QueryClient on router context
+      client.tsx             # hydrateRoot(document, <StartClient />)
+      ssr.tsx                # createStartHandler({ createRouter: getRouter })(defaultStreamHandler)
+      routes/                # file-based routes (router plugin generates routeTree.gen.ts)
+        __root.tsx           # full <html> shell, MUI ThemeProvider + Emotion cache + QueryClientProvider
+        index.tsx
+        samples.tsx          # route loader → fetch FastAPI; useLoaderData in component
+      components/            # Header, CustomLink, CustomButtonLink (MUI ↔ TanStack Router glue)
+      setup/                 # theme.ts (MUI theme)
 
   templates/                 # existing
   tests/
@@ -186,7 +197,7 @@ catalog = { features = ["catalog", "test"],         solve-group = "default" }
 api     = { features = ["catalog", "api", "test"],  solve-group = "default" }
 ```
 
-The React frontend (`frontend/`) has its own `package.json` and is managed by npm/node independently of pixi. It is not pip-installable; the API server is its only Python coupling point.
+The React frontend (`frontend/`) has its own `package.json` and is managed by npm/node independently of pixi. It is not pip-installable; the API server is its only Python coupling point. Stack: Vite + React + TypeScript for the build/dev server, **TanStack Start** as the full-stack framework (file-based routing via the bundled router plugin, plus SSR — pages are server-rendered by Node and hydrated on the client), **Material UI 6 + Emotion** for components and styling (the project was bootstrapped from the official `tanstack-start-example-material-ui` template), and **TanStack Query** for client-side data caching. The dev server is bound to `0.0.0.0:3000` (`host: true`) so the dev-container port forward can reach it; `/api` is proxied to FastAPI on `:8000`. SSR introduces a server-side data path: route `loader`s run in Node and fetch from FastAPI directly (the loader uses `import.meta.env.SSR ? 'http://localhost:8000' : '/api'` because the Vite proxy only intercepts browser requests, not in-process Node fetches). FastAPI is still the only data backend; no Start server functions are used in v1. The `QueryClient` is created per request inside `getRouter()` and exposed via `createRootRouteWithContext<{ queryClient }>` so loaders can call `queryClient.ensureQueryData(...)` and components can `useSuspenseQuery(...)` against the same cache; current routes use a plain `loader` + `useLoaderData` and Query infra is wired but not yet exercised end-to-end.
 
 ---
 
@@ -716,7 +727,7 @@ A read-only FastAPI layer over the same ORM and DB engine used by the scanner. T
 
 **Module responsibilities:**
 
-- **`main.py`** — `create_app() -> FastAPI`: registers routers, adds CORS middleware (origins configurable via `CORS_ORIGINS` env var, defaults to `["http://localhost:5173"]` for the Vite dev server), and wires up a lifespan that reads `CATALOG_DB_URL` (defaulting to `sqlite:///cryoet_catalog.db`) to create and store the engine. Also calls `init_schema(engine)` on startup so a fresh DB gets its tables created automatically — safe to call on an existing DB (`create_all` is idempotent).
+- **`main.py`** — `create_app() -> FastAPI`: registers routers, adds CORS middleware (origins configurable via `CORS_ORIGINS` env var, defaults to `["http://localhost:3000"]` for the TanStack Start dev server (also fine to drop to `[]` since SSR loaders proxy via `/api` and don't trigger CORS — same-origin from the browser's perspective)), and wires up a lifespan that reads `CATALOG_DB_URL` (defaulting to `sqlite:///cryoet_catalog.db`) to create and store the engine. Also calls `init_schema(engine)` on startup so a fresh DB gets its tables created automatically — safe to call on an existing DB (`create_all` is idempotent).
 - **`deps.py`** — `get_session()`: FastAPI dependency that yields a `Session` from `session_scope(engine)`. The engine is retrieved from `app.state` set during lifespan.
 - **`schemas.py`** — Pydantic response models. These are **separate from `cryoet_schema` models** — they are flat, JSON-consumer-shaped output types. For example, `SampleSummary` (list view: id, name, project, data_source, lab, warning count) and `SampleDetail` (full record with nested acquisitions). Keeping them separate means the API can evolve its output shape without touching the validation schema.
 - **`routes/`** — one file per resource group.
@@ -812,5 +823,5 @@ Do **not** stand up a real Postgres in CI for v1. The drift-test + SQLAlchemy ab
 9. `scanner.py` orchestrator + `cli.py`.
 10. End-to-end scanner test on the fixture tree.
 11. **API (`cryoet_catalog/api/`).** `main.py` + `deps.py` + `schemas.py` + the four route files; `test_api.py` using `TestClient` with dependency override. No frontend required to test — `curl` or the auto-generated `/docs` (Swagger UI) is sufficient during development.
-12. **Frontend scaffold.** `npm create vite@latest frontend -- --template react-ts`. Wire up the first real endpoint (`GET /samples`) end-to-end in the browser before adding more routes. This step is a stub — full UI implementation is out of scope for this plan.
+12. **Frontend scaffold.** Bootstrap from the Tanstack Start `start-material-ui` template (gives Vite + React 19 + TanStack Start + MUI 6 + Emotion + the MUI↔Router link adapters in `src/components/`). Add `@tanstack/react-query` and `@tanstack/react-query-devtools`; create the per-request `QueryClient` inside `getRouter()` and expose it via the router context (`createRootRouteWithContext<{ queryClient }>`), then wrap children in `<QueryClientProvider>` inside `__root.tsx`. Set `server.host: true` and `server.proxy['/api'] → http://localhost:8000` in `vite.config.ts` so the dev container can reach it and browser requests reach FastAPI. Wire up `GET /samples` end-to-end as a route `loader` (server-side fetch to FastAPI; `useLoaderData` in the component) before adding more routes. This step is a stub; full UI implementation is out of scope for this plan.
 13. Manual smoke run against a Postgres instance to validate the dialect-portability claim.

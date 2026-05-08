@@ -28,6 +28,9 @@ ALLOWED_DOMAINS=(
   conda.anaconda.org
   repo.anaconda.com
   anaconda.org
+  # docs
+  tanstack.com
+  mui.com
 )
 
 # Flush any prior state so re-running is idempotent.

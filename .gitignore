@@ -10,3 +10,7 @@ data
 
 # database files
 *.db
+
+
+node_modules
+dist
