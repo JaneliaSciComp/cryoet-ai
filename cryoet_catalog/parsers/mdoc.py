@@ -64,35 +64,19 @@ def _parse_datetime(value: str) -> _dt.date | None:
     return None
 
 
-def parse_acquisition_mdocs(frames_dir: Path) -> ParseResult:
-    """Parse the first ``.mdoc`` in ``frames_dir`` and return acquisition fields.
+def parse_mdoc_file(mdoc_path: Path) -> ParseResult:
+    """Parse a single ``.mdoc`` file and return acquisition / tilt-series fields.
 
-    Fields returned (all may be ``None`` / empty if unset):
+    Field shape matches :func:`parse_acquisition_mdocs`; the only difference
+    is the entry point (single file vs. ``frames_dir`` scan). The
+    multi-MDOC tilt-series parser dispatches here per file.
 
-    - ``pixel_size``: float | None  (from ``PixelSpacing``, in Angstroms)
-    - ``voltage``: float | None
-    - ``energy_filter_slit_width``: float | None  (from ``FilterSlitWidth``)
-    - ``date_collected``: ``datetime.date`` | None  (from first ZValue's DateTime)
-    - ``frame_count``: int  (number of ``[ZValue=N]`` sections)
-    - ``dose_per_tilt``: list[float]  (per-tilt ``ExposureDose``)
-    - ``total_dose``: float  (sum of ``dose_per_tilt``)
-    - ``tilt_min``: float | None  (min TiltAngle)
-    - ``tilt_max``: float | None  (max TiltAngle)
-    - ``tilt_axis``: float | None  (from global ``TiltAxisAngle``)
-    - ``defocus_per_image``: list[float]  (from per-tilt ``Defocus``)
-
-    ``status="missing"`` if ``frames_dir`` doesn't exist or contains no
-    ``.mdoc`` file. ``status="unreadable"`` with ``error`` set if a mdoc
-    exists but a numeric coercion fails (malformed value).
+    ``status="missing"`` if ``mdoc_path`` doesn't exist. ``status="unreadable"``
+    with ``error`` set on I/O failure or numeric coercion failure.
     """
-    if not frames_dir.is_dir():
+    if not mdoc_path.is_file():
         return ParseResult(status="missing")
 
-    mdocs = sorted(frames_dir.glob("*.mdoc"))
-    if not mdocs:
-        return ParseResult(status="missing")
-
-    mdoc_path = mdocs[0]
     try:
         text = mdoc_path.read_text()
     except OSError as e:
@@ -167,5 +151,40 @@ def parse_acquisition_mdocs(frames_dir: Path) -> ParseResult:
         "tilt_max": tilt_max,
         "tilt_axis": globals_kv.get("TiltAxisAngle"),
         "defocus_per_image": defocus_per_image,
+        "tilt_angles": tilt_angles,
     }
     return ParseResult(fields=fields, status="ok")
+
+
+def parse_acquisition_mdocs(frames_dir: Path) -> ParseResult:
+    """Parse the first ``.mdoc`` in ``frames_dir`` and return acquisition fields.
+
+    Fields returned (all may be ``None`` / empty if unset):
+
+    - ``pixel_size``: float | None  (from ``PixelSpacing``, in Angstroms)
+    - ``voltage``: float | None
+    - ``energy_filter_slit_width``: float | None  (from ``FilterSlitWidth``)
+    - ``date_collected``: ``datetime.date`` | None  (from first ZValue's DateTime)
+    - ``frame_count``: int  (number of ``[ZValue=N]`` sections)
+    - ``dose_per_tilt``: list[float]  (per-tilt ``ExposureDose``)
+    - ``total_dose``: float  (sum of ``dose_per_tilt``)
+    - ``tilt_min``: float | None  (min TiltAngle)
+    - ``tilt_max``: float | None  (max TiltAngle)
+    - ``tilt_axis``: float | None  (from global ``TiltAxisAngle``)
+    - ``defocus_per_image``: list[float]  (from per-tilt ``Defocus``)
+    - ``tilt_angles``: list[float]  (per-tilt ``TiltAngle`` — full ordered
+      list; consumed by the tilt-series parser and the polar-plot endpoint
+      so the MDOC never has to be re-parsed)
+
+    ``status="missing"`` if ``frames_dir`` doesn't exist or contains no
+    ``.mdoc`` file. ``status="unreadable"`` with ``error`` set if a mdoc
+    exists but a numeric coercion fails (malformed value).
+    """
+    if not frames_dir.is_dir():
+        return ParseResult(status="missing")
+
+    mdocs = sorted(frames_dir.glob("*.mdoc"))
+    if not mdocs:
+        return ParseResult(status="missing")
+
+    return parse_mdoc_file(mdocs[0])

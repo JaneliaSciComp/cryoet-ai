@@ -85,6 +85,9 @@ def test_parse_acquisition_mdocs_typical(tmp_path: Path) -> None:
     assert f["tilt_min"] == pytest.approx(-60.0)
     assert f["tilt_max"] == pytest.approx(-57.0)
     assert f["tilt_axis"] == pytest.approx(84.5)
+    # Full per-image tilt angle list — preserved in order so the
+    # polar-plot endpoint can render without re-parsing.
+    assert f["tilt_angles"] == [pytest.approx(-60.0), pytest.approx(-57.0)]
     # DateTime parsing should produce a date.
     import datetime as _dt
 
