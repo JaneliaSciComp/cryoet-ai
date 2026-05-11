@@ -37,8 +37,18 @@ migrate          = "alembic -c cryoet_catalog/migrations/alembic.ini upgrade hea
 migrate-revision = "alembic -c cryoet_catalog/migrations/alembic.ini revision --autogenerate -m"
 
 [feature.api.dependencies]
-fastapi = ">=0.110"
-uvicorn = "*"
+fastapi         = ">=0.110"
+uvicorn         = "*"
+loguru          = ">=0.7"
+numpy           = ">=1.26"
+matplotlib-base = ">=3.8"
+pillow          = ">=10"
+neuroglancer    = ">=2.40"
+zarr            = ">=2.16"
+tifffile        = ">=2024.1"
+
+[feature.api.pypi-dependencies]
+eerfile = "*"
 
 [feature.api.tasks]
 api      = "uvicorn cryoet_catalog.api.main:app --reload --port 8000"
