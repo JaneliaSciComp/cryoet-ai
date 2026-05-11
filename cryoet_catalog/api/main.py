@@ -2,13 +2,16 @@
 
 The API runs separately from the scanner (the scanner writes; the API reads).
 Configuration via environment:
-  CATALOG_DB_URL    — SQLAlchemy URL (default: sqlite:///cryoet_catalog.db)
-  CORS_ORIGINS      — comma-separated allowed origins (default: http://localhost:5173)
-  CATALOG_DATA_ROOT — filesystem root that bounds all preview/Neuroglancer reads.
-                      Required at startup; the API refuses to start without it.
+  CATALOG_DB_URL             — SQLAlchemy URL (default: sqlite:///cryoet_catalog.db)
+  CORS_ORIGINS               — comma-separated allowed origins (default: http://localhost:5173)
+  CATALOG_DATA_ROOT          — filesystem root that bounds all preview/Neuroglancer reads.
+                               Required at startup; the API refuses to start without it.
+  NEUROGLANCER_MAX_VIEWERS   — bounded LRU size for active viewers (default 8).
 """
 from __future__ import annotations
+import asyncio
 import os
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -32,6 +35,7 @@ from cryoet_catalog.api.routes import (
     samples,
     scans,
     stats,
+    tomograms,
     warnings as warnings_routes,
 )
 
@@ -95,6 +99,19 @@ async def _lifespan(app: FastAPI):
             workers,
         )
 
+    # Bounded Neuroglancer-viewer registry (plan §7.4 / §11.9). Initialized
+    # only if not already set so tests can pre-seed for inspection.
+    if getattr(app.state, "active_viewers", None) is None:
+        app.state.active_viewers = OrderedDict()
+    if getattr(app.state, "active_viewers_lock", None) is None:
+        app.state.active_viewers_lock = asyncio.Lock()
+    if getattr(app.state, "neuroglancer_max_viewers", None) is None:
+        raw_max = os.environ.get("NEUROGLANCER_MAX_VIEWERS", "8")
+        try:
+            app.state.neuroglancer_max_viewers = max(1, int(raw_max))
+        except ValueError:
+            app.state.neuroglancer_max_viewers = 8
+
     yield
     if not pre_seeded_engine:
         app.state.engine.dispose()
@@ -116,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(extras.router, prefix="/extras", tags=["extras"])
     app.include_router(filters.router, prefix="/filters", tags=["filters"])
     app.include_router(stats.router, prefix="/stats", tags=["stats"])
+    app.include_router(tomograms.router, prefix="/tomograms", tags=["tomograms"])
     return app
 
 
