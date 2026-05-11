@@ -1,4 +1,4 @@
-"""GET /scans and /scans/latest."""
+"""GET /scans, /scans/latest, /scans/{scan_run_id}."""
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -40,4 +40,15 @@ def get_latest_completed(session: Session = Depends(get_session)):
     ).scalars().first()
     if row is None:
         raise HTTPException(status_code=404, detail="no completed scan")
+    return _to_out(row)
+
+
+# NOTE: must be declared after ``/latest`` — FastAPI matches routes in
+# registration order, and a bare ``/{scan_run_id}`` would otherwise swallow
+# the literal ``/latest`` path.
+@router.get("/{scan_run_id}", response_model=ScanOut)
+def get_scan(scan_run_id: str, session: Session = Depends(get_session)):
+    row = session.get(orm.ScansORM, scan_run_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="scan not found")
     return _to_out(row)
