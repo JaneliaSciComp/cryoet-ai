@@ -122,6 +122,18 @@ def test_list_samples_includes_warning_count(client):
     assert by_id["sample_b"]["warning_count"] == 0
 
 
+def test_list_samples_includes_child_counts(client):
+    """sample_a is seeded with 1 acquisition, 1 tomogram, 0 tilt_series."""
+    r = client.get("/samples")
+    by_id = {s["sample_id"]: s for s in r.json()}
+    assert by_id["sample_a"]["n_acquisitions"] == 1
+    assert by_id["sample_a"]["n_tomograms"] == 1
+    assert by_id["sample_a"]["n_tilt_series"] == 0
+    assert by_id["sample_b"]["n_acquisitions"] == 0
+    assert by_id["sample_b"]["n_tomograms"] == 0
+    assert by_id["sample_b"]["n_tilt_series"] == 0
+
+
 def test_list_samples_pagination(client):
     r = client.get("/samples", params={"limit": 1, "offset": 0})
     assert len(r.json()) == 1
