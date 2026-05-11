@@ -183,10 +183,11 @@ def upsert_sample_record(
         .where(orm.AunpORM.ordinal >= len(record.aunp))
     )
 
-    # ---- Step 4: acquisitions / tomograms / annotations -------------------
+    # ---- Step 4: acquisitions / tomograms / annotations / tilt_series ----
     keep_acq_pks: set[tuple[str, str]] = set()
     keep_tomo_pks: set[tuple[str, str, str]] = set()
     keep_ann_pks: set[tuple[str, str, str]] = set()
+    keep_ts_pks: set[tuple[str, str, str]] = set()
 
     for acq_id, acq_file in record.acquisitions.items():
         acq_payload = acq_file.acquisition.model_dump(
@@ -234,6 +235,22 @@ def upsert_sample_record(
             )
             keep_ann_pks.add((sample_id, acq_id, ann.annotation_id))
 
+        for ts in acq_file.tilt_series:
+            # ``tilt_series_id`` is required at the DB level (composite PK)
+            # but Optional on the Pydantic model. The scanner always sets
+            # it; defensive skip on None preserves the invariant.
+            if ts.tilt_series_id is None:
+                continue
+            ts_payload = ts.model_dump(exclude_none=False, by_alias=False)
+            ts_payload["sample_id"] = sample_id
+            ts_payload["acquisition_id"] = acq_id
+            session.merge(
+                orm.TiltSeriesORM(
+                    **_filter_to_columns(ts_payload, orm.TiltSeriesORM)
+                )
+            )
+            keep_ts_pks.add((sample_id, acq_id, ts.tilt_series_id))
+
     # Step 7: stale-row cleanup for multi-row child tables.
     _delete_stale_children(
         session,
@@ -255,6 +272,13 @@ def upsert_sample_record(
         sample_id,
         pk_cols=("sample_id", "acquisition_id", "annotation_id"),
         keep=keep_ann_pks,
+    )
+    _delete_stale_children(
+        session,
+        orm.TiltSeriesORM,
+        sample_id,
+        pk_cols=("sample_id", "acquisition_id", "tilt_series_id"),
+        keep=keep_ts_pks,
     )
 
     # ---- Step 5: extras refresh -------------------------------------------

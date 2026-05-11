@@ -153,6 +153,9 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
     if et == "annotation":
         # entity_pk = (sample_id, acq_id, annotation_id)
         return f"acquisitions.{pk[1]}.annotation[{pk[2]}]"
+    if et == "tilt_series":
+        # entity_pk = (sample_id, acq_id, tilt_series_id)
+        return f"acquisitions.{pk[1]}.tilt_series[{pk[2]}]"
     return et
 
 
@@ -275,6 +278,21 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
                     ExtrasEntry(
                         "annotation",
                         (sample_id, acq_id, ann.annotation_id),
+                        k,
+                        v,
+                    )
+                )
+        for ts in acq_file.tilt_series:
+            # ``tilt_series_id`` may legitimately be None on TOML-authored rows
+            # (the scanner is the canonical writer); only emit extras when an
+            # id is present so the PK tuple is well-formed.
+            if ts.tilt_series_id is None:
+                continue
+            for k, v in (ts.model_extra or {}).items():
+                out.append(
+                    ExtrasEntry(
+                        "tilt_series",
+                        (sample_id, acq_id, ts.tilt_series_id),
                         k,
                         v,
                     )

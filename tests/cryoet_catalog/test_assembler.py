@@ -319,9 +319,14 @@ def test_unparseable_mdoc_emits_warning(tmp_path):
     loc = _sample_loc(sample_dir)
     result = assemble_sample(loc)
 
+    # An unreadable MDOC produces two `unparseable_mdoc` warnings with
+    # distinct locations: one from the acquisition-level MDOC parser
+    # (location ends in ``.Frames``) and one from the tilt-series parser
+    # (location includes the MDOC path under ``.tilt_series[...]``).
     bad = [w for w in result.warnings if w.category == "unparseable_mdoc"]
-    assert len(bad) == 1
-    assert bad[0].location.endswith("Pos1.Frames")
+    assert len(bad) == 2
+    assert any(w.location.endswith("Pos1.Frames") for w in bad)
+    assert any(".tilt_series[" in w.location for w in bad)
 
     acq = result.record.acquisitions["Pos1"].acquisition
     assert acq.pixel_size is None

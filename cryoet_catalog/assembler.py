@@ -28,6 +28,7 @@ from cryoet_catalog.parsers.frame_ext import infer_camera
 from cryoet_catalog.parsers.mdoc import parse_acquisition_mdocs
 from cryoet_catalog.parsers.mrc_header import read_mrc_header
 from cryoet_catalog.parsers.ome_zarr import read_zarr_attrs
+from cryoet_catalog.parsers.tilt_series import parse_tilt_series_dir
 from cryoet_catalog.parsers.toml_files import load_sample_toml
 
 
@@ -42,6 +43,7 @@ ScanWarningCategory = Literal[
     "unparseable_zarr_attrs",
     "ambiguous_frame_extension",
     "voxel_spacing_implied_mismatch",
+    "tilt_series_id_collision",
 ]
 
 
@@ -216,6 +218,12 @@ def assemble_sample(
         acq_file = record.acquisitions[acq_loc.acquisition_id]
         acq = acq_file.acquisition
 
+        # Record the acquisition directory once, regardless of whether the
+        # acquisition was synthesized or had an acquisition.toml — powers the
+        # UI's copy-path / open-in-file-browser buttons (plan §5.2).
+        if acq.path is None:
+            acq.path = str(acq_loc.path)
+
         # Step 2: MDOC + frame-ext ------------------------------------------
         if acq_loc.frames_dir is not None:
             mdoc_result = parse_acquisition_mdocs(acq_loc.frames_dir)
@@ -243,6 +251,42 @@ def assemble_sample(
                 )
             elif cam_result.status == "ok" and acq.camera is None:
                 acq.camera = cam_result.fields.get("camera")
+
+            # Tilt-series parsing — one row per MDOC. The acquisition-level
+            # MDOC parser above only covers the first MDOC alphabetically;
+            # this loop catalogues every MDOC. ``microscope`` / ``camera``
+            # come from acquisition.toml only (plan §11.14).
+            ts_result = parse_tilt_series_dir(acq_loc.frames_dir)
+            for mdoc_path_str, err_msg in ts_result.unreadable:
+                result.warnings.append(
+                    ScanWarning(
+                        category="unparseable_mdoc",
+                        location=(
+                            f"acquisitions.{acq_loc.acquisition_id}"
+                            f".tilt_series[{mdoc_path_str}]"
+                        ),
+                        message=err_msg,
+                    )
+                )
+            for collision in ts_result.collisions:
+                result.warnings.append(
+                    ScanWarning(
+                        category="tilt_series_id_collision",
+                        location=(
+                            f"acquisitions.{acq_loc.acquisition_id}"
+                            f".tilt_series[{collision.tilt_series_id}]"
+                        ),
+                        message=(
+                            f"MDOC '{collision.mdoc_path}' shares stem "
+                            f"'{collision.original_stem}' with another MDOC in "
+                            f"the same acquisition; disambiguated to "
+                            f"tilt_series_id='{collision.tilt_series_id}'"
+                        ),
+                    )
+                )
+            # Replace any TOML-authored tilt_series list with the parser's
+            # output — the scanner is the canonical writer for this field.
+            acq_file.tilt_series = ts_result.records
 
         # Step 3 + 4: tomograms ---------------------------------------------
         existing_tomos = {t.tomogram_id: t for t in acq_file.tomogram}
@@ -272,6 +316,11 @@ def assemble_sample(
             mrc_path_str: str | None = None
             if tomo_loc.mrc_files:
                 mrc_path_str = str(tomo_loc.mrc_files[0])
+                if tomo.size_bytes is None:
+                    try:
+                        tomo.size_bytes = tomo_loc.mrc_files[0].stat().st_size
+                    except OSError:
+                        pass
                 mrc_result = read_mrc_header(tomo_loc.mrc_files[0])
                 if mrc_result.status == "unreadable":
                     result.warnings.append(
