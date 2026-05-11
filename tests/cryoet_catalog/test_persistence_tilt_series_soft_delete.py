@@ -130,6 +130,38 @@ def test_resurrection_via_reupsert_brings_tilt_series_back(session) -> None:
     assert {(r.tilt_series_id,) for r in rows} == {("ts_a",)}
 
 
+def test_stale_per_mdoc_rows_pruned_on_relaxed_parser(session) -> None:
+    """Phase 4.6 regression: a DB seeded by the OLD parser with one row per
+    MDOC must collapse to a single row on re-upsert with the new parser.
+
+    Mimics the gouauxlab upgrade path: the previous scan persisted 33 rows
+    (one per MDOC file). After the parser change, a re-scan collapses them
+    to one row, and ``_delete_stale_children`` prunes the obsolete 32.
+    """
+    # Seed with 33 per-MDOC rows (the broken-old-parser state).
+    old_ids = tuple(f"file_{i:03d}_{i * 3 - 30}.0" for i in range(33))
+    r_old = _make_record_with_tilt_series(tilt_series_ids=old_ids)
+    upsert_sample_record(
+        session, r_old, extras=[], tomogram_aux={}, warnings=[], scan_run_id="run-old"
+    )
+    session.commit()
+    assert (
+        len(session.execute(select(orm.TiltSeriesORM)).scalars().all()) == 33
+    )
+
+    # Re-upsert with the collapsed (new-parser) shape: one row.
+    r_new = _make_record_with_tilt_series(
+        tilt_series_ids=("20241211_HippWaffle_49",)
+    )
+    upsert_sample_record(
+        session, r_new, extras=[], tomogram_aux={}, warnings=[], scan_run_id="run-new"
+    )
+    session.commit()
+
+    rows = session.execute(select(orm.TiltSeriesORM)).scalars().all()
+    assert [r.tilt_series_id for r in rows] == ["20241211_HippWaffle_49"]
+
+
 def test_upsert_removes_stale_tilt_series_rows(session) -> None:
     """Re-upserting with a smaller tilt_series set deletes the dropped row."""
     r1 = _make_record_with_tilt_series(tilt_series_ids=("ts_a", "ts_b"))

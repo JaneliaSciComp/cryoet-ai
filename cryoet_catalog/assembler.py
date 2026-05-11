@@ -44,6 +44,7 @@ ScanWarningCategory = Literal[
     "ambiguous_frame_extension",
     "voxel_spacing_implied_mismatch",
     "tilt_series_id_collision",
+    "tilt_series_layout_unknown",
 ]
 
 
@@ -252,11 +253,15 @@ def assemble_sample(
             elif cam_result.status == "ok" and acq.camera is None:
                 acq.camera = cam_result.fields.get("camera")
 
-            # Tilt-series parsing — one row per MDOC. The acquisition-level
-            # MDOC parser above only covers the first MDOC alphabetically;
-            # this loop catalogues every MDOC. ``microscope`` / ``camera``
-            # come from acquisition.toml only (plan §11.14).
-            ts_result = parse_tilt_series_dir(acq_loc.frames_dir)
+            # Tilt-series parsing. The acquisition-level MDOC parser above
+            # only covers the first MDOC alphabetically; this loop
+            # catalogues every series-level MDOC (one record each) and
+            # collapses per-tilt MDOC groups (gouauxlab convention) into
+            # single records. ``microscope`` / ``camera`` come from
+            # acquisition.toml only (plan §11.14).
+            ts_result = parse_tilt_series_dir(
+                acq_loc.frames_dir, acquisition_id=acq_loc.acquisition_id
+            )
             for mdoc_path_str, err_msg in ts_result.unreadable:
                 result.warnings.append(
                     ScanWarning(
@@ -266,6 +271,17 @@ def assemble_sample(
                             f".tilt_series[{mdoc_path_str}]"
                         ),
                         message=err_msg,
+                    )
+                )
+            for path_str, msg in ts_result.layout_unknown:
+                result.warnings.append(
+                    ScanWarning(
+                        category="tilt_series_layout_unknown",
+                        location=(
+                            f"acquisitions.{acq_loc.acquisition_id}"
+                            f".tilt_series[{path_str}]"
+                        ),
+                        message=msg,
                     )
                 )
             for collision in ts_result.collisions:

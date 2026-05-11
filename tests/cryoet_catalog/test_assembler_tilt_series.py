@@ -144,6 +144,98 @@ def test_assembler_records_tomogram_size_bytes(tmp_path: Path) -> None:
     assert tomo.size_bytes == mrc_path.stat().st_size
 
 
+_PER_TILT_HEADER = """\
+PixelSpacing = 1.7
+Voltage = 200
+TiltAxisAngle = 92.5
+"""
+
+
+def test_per_tilt_layout_produces_one_row(tmp_path: Path) -> None:
+    """Gouauxlab-style frames dir (3 per-tilt MDOCs + EERs) yields 1 row.
+
+    Before Phase 4.6 each per-tilt MDOC produced its own spurious row.
+    Now the parser collapses the group by common prefix.
+    """
+    sample_dir = tmp_path / "sample_gouaux"
+    _write(
+        sample_dir / "sample.toml",
+        """
+        [sample]
+        data_source = "cryoet"
+        project = "chromatin"
+        """,
+    )
+    _write(
+        sample_dir / "Pos1" / "acquisition.toml",
+        """
+        [acquisition]
+        microscope = "Krios"
+        """,
+    )
+    frames_dir = sample_dir / "Pos1" / "Frames"
+    frames_dir.mkdir(parents=True)
+    for idx, angle in enumerate(["-30.0", "0.0", "30.0"], start=1):
+        (frames_dir / f"20241211_Hipp_42_{idx:03d}_{angle}.eer.mdoc").write_text(
+            _PER_TILT_HEADER
+        )
+        (frames_dir / f"20241211_Hipp_42_{idx:03d}_{angle}.eer").write_bytes(b"")
+
+    result = assemble_sample(_sample_loc(sample_dir))
+
+    assert result.record is not None
+    acq_file = result.record.acquisitions["Pos1"]
+    assert len(acq_file.tilt_series) == 1
+    ts = acq_file.tilt_series[0]
+    assert ts.tilt_series_id == "20241211_Hipp_42"
+    assert ts.n_tilts == 3
+    assert ts.tilt_angles == [
+        pytest.approx(-30.0),
+        pytest.approx(0.0),
+        pytest.approx(30.0),
+    ]
+    # No layout_unknown warnings — all 3 MDOC names match the pattern.
+    layout_warnings = [
+        w for w in result.warnings if w.category == "tilt_series_layout_unknown"
+    ]
+    assert layout_warnings == []
+
+
+def test_assembler_emits_layout_unknown_warning(tmp_path: Path) -> None:
+    """A frames dir of non-series-level MDOCs whose names lack the angle
+    pattern triggers a ``tilt_series_layout_unknown`` warning.
+    """
+    sample_dir = tmp_path / "sample_unknown"
+    _write(
+        sample_dir / "sample.toml",
+        """
+        [sample]
+        data_source = "cryoet"
+        project = "chromatin"
+        """,
+    )
+    _write(
+        sample_dir / "Pos1" / "acquisition.toml",
+        """
+        [acquisition]
+        microscope = "Krios"
+        """,
+    )
+    frames_dir = sample_dir / "Pos1" / "Frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "weird_name.mdoc").write_text(_PER_TILT_HEADER)
+    (frames_dir / "another_weird.mdoc").write_text(_PER_TILT_HEADER)
+
+    result = assemble_sample(_sample_loc(sample_dir))
+
+    assert result.record is not None
+    layout_warnings = [
+        w for w in result.warnings if w.category == "tilt_series_layout_unknown"
+    ]
+    assert len(layout_warnings) == 1
+    assert "Pos1" in layout_warnings[0].location
+
+
 def test_assembler_emits_tilt_series_collision_warning(tmp_path: Path) -> None:
     """When two MDOCs in an acquisition would yield the same tilt_series_id,
     the assembler emits a tilt_series_id_collision warning.
@@ -194,7 +286,7 @@ def test_assembler_emits_tilt_series_collision_warning(tmp_path: Path) -> None:
     )
 
     original = assembler.parse_tilt_series_dir
-    assembler.parse_tilt_series_dir = lambda _path: fake_result
+    assembler.parse_tilt_series_dir = lambda _path, **_kw: fake_result
     try:
         result = assemble_sample(_sample_loc(sample_dir))
     finally:

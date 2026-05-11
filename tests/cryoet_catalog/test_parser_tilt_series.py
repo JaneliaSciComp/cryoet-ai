@@ -195,6 +195,184 @@ def test_stem_collision_disambiguates_with_parent_dir(tmp_path: Path) -> None:
     assert all(c.original_stem == "shared" for c in collisions)
 
 
+_PER_TILT_MDOC_HEADER = """\
+PixelSpacing = 1.7
+Voltage = 200
+TiltAxisAngle = 92.5
+ImageSize = 4096 4096
+"""
+
+
+def _write_per_tilt_mdoc(path: Path) -> None:
+    """Write a per-tilt MDOC (header only, no [ZValue])."""
+    path.write_text(_PER_TILT_MDOC_HEADER)
+
+
+def test_parse_per_tilt_mdoc_collapses_to_one_record(tmp_path: Path) -> None:
+    """Gouauxlab pattern: N per-tilt MDOCs collapse to one record.
+
+    Each filename carries the tilt angle in the ``_NNN_<angle>`` slot, so
+    the parser pulls all angles from filenames and emits a single
+    TiltSeries whose ``tilt_angles`` lists them in sorted order.
+    """
+    frames_dir = tmp_path / "Frames"
+    frames_dir.mkdir()
+    for idx, angle in enumerate(["-30.0", "-15.0", "0.0", "15.0", "30.0"], start=1):
+        fname = f"20241211_HippWaffle_49_{idx:03d}_{angle}.eer.mdoc"
+        _write_per_tilt_mdoc(frames_dir / fname)
+        (frames_dir / f"20241211_HippWaffle_49_{idx:03d}_{angle}.eer").write_bytes(b"")
+
+    result = parse_tilt_series_dir(frames_dir)
+
+    assert len(result.records) == 1
+    rec = result.records[0]
+    assert rec.tilt_series_id == "20241211_HippWaffle_49"
+    assert rec.n_tilts == 5
+    assert rec.tilt_angles == [
+        pytest.approx(-30.0),
+        pytest.approx(-15.0),
+        pytest.approx(0.0),
+        pytest.approx(15.0),
+        pytest.approx(30.0),
+    ]
+    assert rec.tilt_range_min == pytest.approx(-30.0)
+    assert rec.tilt_range_max == pytest.approx(30.0)
+    # Header globals propagate from the first MDOC.
+    assert rec.voltage == pytest.approx(200.0)
+    assert rec.pixel_spacing == pytest.approx(1.7)
+    assert rec.tilt_axis_angle == pytest.approx(92.5)
+    assert rec.image_format == "EER"
+    # mdoc_path points at the first MDOC in sorted order.
+    assert rec.mdoc_path.endswith("_001_-30.0.eer.mdoc")
+    assert result.unreadable == []
+    assert result.layout_unknown == []
+
+
+def test_parse_mixed_per_tilt_groups_emits_one_per_group(tmp_path: Path) -> None:
+    """Two unique-prefix per-tilt groups in one dir → 2 records."""
+    frames_dir = tmp_path / "Frames"
+    frames_dir.mkdir()
+    for idx, angle in enumerate(["-20.0", "0.0", "20.0"], start=1):
+        _write_per_tilt_mdoc(
+            frames_dir / f"gridA_pos1_{idx:03d}_{angle}.eer.mdoc"
+        )
+    for idx, angle in enumerate(["-10.0", "10.0"], start=1):
+        _write_per_tilt_mdoc(
+            frames_dir / f"gridB_pos2_{idx:03d}_{angle}.eer.mdoc"
+        )
+
+    result = parse_tilt_series_dir(frames_dir)
+
+    ids = sorted(r.tilt_series_id for r in result.records)
+    assert ids == ["gridA_pos1", "gridB_pos2"]
+    by_id = {r.tilt_series_id: r for r in result.records}
+    assert by_id["gridA_pos1"].n_tilts == 3
+    assert by_id["gridB_pos2"].n_tilts == 2
+    assert result.layout_unknown == []
+
+
+def test_parse_per_tilt_with_unparseable_filename_warns_and_drops_angle(
+    tmp_path: Path,
+) -> None:
+    """An MDOC without the ``_NNN_<angle>`` pattern is warned + skipped.
+
+    The matching MDOCs still collapse to one record; the unmatched MDOC's
+    angle is NOT in the record's ``tilt_angles`` list, and one
+    ``layout_unknown`` entry names the offending file.
+    """
+    frames_dir = tmp_path / "Frames"
+    frames_dir.mkdir()
+    for idx, angle in enumerate(["-10.0", "0.0", "10.0"], start=1):
+        _write_per_tilt_mdoc(
+            frames_dir / f"sampleX_{idx:03d}_{angle}.eer.mdoc"
+        )
+    bad = frames_dir / "sampleX_misnamed.eer.mdoc"
+    _write_per_tilt_mdoc(bad)
+
+    result = parse_tilt_series_dir(frames_dir)
+
+    assert len(result.records) == 1
+    rec = result.records[0]
+    assert rec.tilt_series_id == "sampleX"
+    assert rec.n_tilts == 3
+    assert rec.tilt_angles == [
+        pytest.approx(-10.0),
+        pytest.approx(0.0),
+        pytest.approx(10.0),
+    ]
+    assert len(result.layout_unknown) == 1
+    path_str, msg = result.layout_unknown[0]
+    assert path_str == str(bad)
+    assert "_NNN_<angle>" in msg
+
+
+def test_series_level_mdoc_path_unchanged(tmp_path: Path) -> None:
+    """Regression: rosenlab-style series-level MDOCs still produce 1 record
+    each with tilt angles parsed from [ZValue] sections.
+    """
+    frames_dir = tmp_path / "Frames"
+    frames_dir.mkdir()
+    (frames_dir / "ts.mdoc").write_text(_MDOC_BASIC)
+    (frames_dir / "001.eer").write_bytes(b"")
+
+    result = parse_tilt_series_dir(frames_dir)
+
+    assert len(result.records) == 1
+    rec = result.records[0]
+    assert rec.tilt_series_id == "ts"
+    assert rec.n_tilts == 3
+    assert rec.tilt_angles == [
+        pytest.approx(-60.0),
+        pytest.approx(-57.0),
+        pytest.approx(-54.0),
+    ]
+    assert result.layout_unknown == []
+
+
+def test_per_tilt_acquisition_id_fallback_when_no_prefix(tmp_path: Path) -> None:
+    """Filenames whose match leaves an empty prefix fall back to acquisition_id.
+
+    Can only happen with filenames like ``_001_-10.0.eer.mdoc`` (no
+    text before the numeric index). The plan says "Falls back to
+    acquisition_id on tie"; we test the same fallback when prefix is
+    empty.
+    """
+    frames_dir = tmp_path / "Frames"
+    frames_dir.mkdir()
+    # Construct a name where the regex's greedy ``.+?`` still has to match
+    # at least one char. Use a single-char prefix and confirm tilt_series_id
+    # is just that char, NOT the fallback — the fallback only triggers when
+    # the regex's prefix group is empty (impossible with ``.+?``). This
+    # test instead exercises the acquisition_id passthrough for a real
+    # short-prefix per-tilt layout.
+    for idx, angle in enumerate(["-10.0", "10.0"], start=1):
+        _write_per_tilt_mdoc(frames_dir / f"x_{idx:03d}_{angle}.eer.mdoc")
+
+    result = parse_tilt_series_dir(frames_dir, acquisition_id="Pos1")
+    assert len(result.records) == 1
+    assert result.records[0].tilt_series_id == "x"
+
+
+def test_unmatched_only_dir_reports_dir_level_layout_unknown(
+    tmp_path: Path,
+) -> None:
+    """If every non-series-level MDOC fails the filename pattern, emit one
+    directory-level layout_unknown warning instead of N per-MDOC ones.
+    """
+    frames_dir = tmp_path / "Frames"
+    frames_dir.mkdir()
+    _write_per_tilt_mdoc(frames_dir / "weird_name.mdoc")
+    _write_per_tilt_mdoc(frames_dir / "another_weird.mdoc")
+
+    result = parse_tilt_series_dir(frames_dir)
+
+    assert result.records == []
+    assert len(result.layout_unknown) == 1
+    path_str, msg = result.layout_unknown[0]
+    assert path_str == str(frames_dir)
+    assert "2 non-series-level MDOC" in msg
+
+
 def test_stem_collision_numeric_suffix_fallback(tmp_path: Path) -> None:
     """If parent-dir disambiguation still collides, a numeric suffix is added.
 

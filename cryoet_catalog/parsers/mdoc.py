@@ -64,6 +64,26 @@ def _parse_datetime(value: str) -> _dt.date | None:
     return None
 
 
+def is_series_level_mdoc(mdoc_path: Path) -> bool:
+    """Return True if the MDOC contains at least one ``[ZValue`` section.
+
+    Cheap check used by the tilt-series layout classifier — reads the first
+    2 KB only, since the first ``[ZValue`` always falls inside the early
+    header region of a series-level MDOC. Per-tilt (gouauxlab-style) MDOCs
+    have no ``[ZValue`` sections; their tilt angle lives in the filename.
+
+    Missing / unreadable files return False; the classifier interprets that
+    as "not series-level" and the surrounding parser still records the
+    underlying parse failure separately.
+    """
+    try:
+        with mdoc_path.open("rb") as f:
+            head = f.read(2048)
+    except OSError:
+        return False
+    return b"[ZValue" in head
+
+
 def parse_mdoc_file(mdoc_path: Path) -> ParseResult:
     """Parse a single ``.mdoc`` file and return acquisition / tilt-series fields.
 
