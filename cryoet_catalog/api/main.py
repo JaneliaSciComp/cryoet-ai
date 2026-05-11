@@ -26,7 +26,13 @@ except ModuleNotFoundError:
     pass
 
 from cryoet_catalog import db
-from cryoet_catalog.api.routes import samples, scans, warnings as warnings_routes, extras
+from cryoet_catalog.api.routes import (
+    extras,
+    filters,
+    samples,
+    scans,
+    warnings as warnings_routes,
+)
 
 
 def _parse_origins(raw: str) -> list[str]:
@@ -107,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(scans.router, prefix="/scans", tags=["scans"])
     app.include_router(warnings_routes.router, prefix="/samples", tags=["warnings"])
     app.include_router(extras.router, prefix="/extras", tags=["extras"])
+    app.include_router(filters.router, prefix="/filters", tags=["filters"])
     return app
 
 
