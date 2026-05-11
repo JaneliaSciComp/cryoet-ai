@@ -467,11 +467,37 @@ Each phase ends with a green test suite and a manually verifiable demo. The orde
 22. `test_api_path_validation.py`: every preview/Neuroglancer route 404s for paths outside `CATALOG_DATA_ROOT` (including symlink-traversal cases).
    - **Demo:** browser opens each preview URL and sees an image; Neuroglancer opens for both tomograms and tilt series; preview/Neuroglancer routes refuse paths outside the data root.
 
-**Phase 4.5 — Real-data integration checkpoint**
+**Phase 4.5 — Real-data integration checkpoint** *(run 2026-05-11; gate revised — see findings below)*
 23. Run `pixi run scan` against a real researcher data root (not synthetic fixtures). Record any parse errors or warnings.
 24. Curl every new endpoint with at least one real row id from each: `/samples` (with each filter exercised at least once), `/filters/options`, `/stats/overview`, `/samples/{id}`, `/tomograms/.../preview.png`, `/tilt-series/.../preview.png`, `/tilt-series/.../polar.png`, `/scans`. Eyeball every response.
 25. Look for surprises: NULL `microscope` everywhere (= TOMLs need updating), empty filter facets, broken paths, slow endpoints, missing fields the frontend will need. Open issues for anything that needs fixing before frontend phases. Update the plan if scope changes.
-   - **Gate:** frontend phases do not start until this checkpoint is clean.
+
+**Run results (2026-05-11, root `/groups/cryoet/cryoet/data/scratch/data/`):**
+- Scan: 5 samples upserted, 0 skipped, 70 warnings, 0 errors.
+- Warning categories: `undeclared_tomogram_folder × 38`, `undeclared_annotation_folder × 12`, `missing_acquisition_toml × 12`, `unfilled_placeholder × 8`.
+- Endpoints exercised: `/samples`, `/filters/options`, `/stats/overview`, `/samples/{id}`, `/scans`, `/tilt-series/.../polar.png` → all 200. `/tilt-series/.../preview.png` → 422 on every row. Tomogram + Neuroglancer endpoints not exercisable (see finding #3).
+
+**Findings:**
+1. **gouauxlab per-tilt MDOC layout collapses to N tilt-series rows instead of 1.** Each EER frame has a sibling `.mdoc`; `parsers/tilt_series.py::parse_tilt_series_dir` emits one row per MDOC, producing ~33 spurious tilt-series rows per acquisition. Affects all 4 `gouauxlab_*` samples. Reference impl: `aicryoet-tools/src/aicryoet_tools/mdoc.py::get_tilt_angles` already handles the series-level-vs-per-tilt distinction. Parser+assembler+persistence fix, ~½ day.
+2. **Rosenlab tilt-series are EER-only with no zarr and no `.st` stack.** Preview route skips EER at request time (too slow) and the frames-dir TIFF/MRC fallback finds nothing. Polar works because angles are cached on the row. Two unblocks: (a) pre-render zarr next to one MDOC via `aicryoet-tools` converter for the demo, or (b) accept slow-EER preview as a follow-on with disk-cached output. Also cheap-and-incremental: teach the preview route to read `.st` stacks (slice N/2 of the MRC-format stack) when `st_path` is set.
+3. **Zero tomograms in DB.** 38 `undeclared_tomogram_folder` warnings — directories exist on disk but no acquisition TOML declares them. Tomogram preview + Neuroglancer surfaces stay untested until upstream TOML coverage improves. Same TOML-coverage finding hits `undeclared_annotation_folder` and `missing_acquisition_toml`.
+
+**Gate revised — finding #1 is a hard prereq for Phase 5; findings #2 and #3 are not.** Finding #1 (gouauxlab parser bug) distorts the *data model* (66+ spurious tilt-series rows across 4 samples) so any frontend work would be coded against bad cardinality and bad stats. Findings #2 (EER-only, no zarr/`.st`) and #3 (TOML coverage / zero tomograms) only block the *success path* of preview/Neuroglancer endpoints — they're surfaces with empty/error states, not bad data. So Phase 4.6 is added as a hard prereq to Phase 5; findings #2 and #3 stay tracked outside this plan.
+
+**Phase 4.6 — Gouauxlab per-tilt MDOC parser fix** *(prereq for Phase 5)*
+
+Detects per-tilt MDOC layouts (multiple `.mdoc` sidecars in one frames dir, one per EER frame, no `[ZValue]` sections) and collapses N spurious tilt-series rows into 1 correct row whose `tilt_angles` is the list of angles extracted from per-tilt MDOC filenames. Reference: `aicryoet-tools/src/aicryoet_tools/mdoc.py::get_tilt_angles` already handles the series-level-vs-per-tilt distinction.
+
+23a. Add layout classifier to `cryoet_catalog/parsers/tilt_series.py`: series-level (any MDOC contains `[ZValue`, sniff first 2KB) vs per-tilt (multiple MDOCs, none with `[ZValue`, filenames match `_NNN_<angle>` regex) vs unknown. Helper `is_series_level_mdoc(path)` in `parsers/mdoc.py`.
+23b. Per-tilt collapse path: emit one `TiltSeriesRecord` per unique filename-prefix group, with `tilt_angles` = `[extract_tilt_angle_from_filename(m.name) for m in mdocs]`, `n_tilts` = `len(tilt_angles)`, derived `tilt_range_min/max`. `tilt_series_id` = longest-common-prefix of MDOC filenames with trailing `_NNN_<angle>...` stripped (e.g. `20241211_HippWaffle_49`); falls back to `acquisition_id` on tie. `mdoc_path` = first MDOC in sorted order.
+23c. Mixed dirs: one record per unique-prefix group. Stem-collision logic in `_disambiguate_ids` preserved at group granularity.
+23d. New warning category `tilt_series_layout_unknown` for directories where neither classifier matches (loud-but-non-blocking, same convention as `tilt_series_id_collision`).
+23e. No assembler / persistence changes expected. `_delete_stale_children` already prunes rows whose composite PK isn't in the new upsert set — the 32 spurious gouauxlab rows per acquisition prune automatically on re-scan.
+23f. Tests: per-tilt collapse, mixed-group emission, unparseable-filename warning + angle drop, series-level regression, assembler integration, stale-row pruning regression.
+23g. Deployment: wipe + `pixi run scan --init` against real data root (mtime gating won't fire on parser-logic changes; `--force` would also work). Verify `gouauxlab_*` samples now report 1–2 tilt-series per acquisition and total tilt-series count drops from 66+ to ~10-15.
+   - **Demo:** `/tilt-series/<gouauxlab_sample>/<acq>/<ts>/polar.png` produces a meaningful multi-angle plot, not a single radial line.
+
+Effort ~½ day. Risk low — additive change (per-tilt path is new code; series-level path unchanged and confirmed working against rosenlab data).
 
 **Phase 5 — Frontend infrastructure**
 26. Add Zod-validated search params on `/samples` (minimal schema per §9.1, every drawer field `.optional()`).
@@ -532,7 +558,7 @@ The original plan flagged a dozen open questions; all were settled before writin
 - **Multi-worker Neuroglancer.** Single-worker uvicorn is fine for MVP but not a hardened production posture. Track as a follow-on.
 - **Alembic autogenerate gaps on SQLite.** `render_as_batch=True` is mandatory for ALTER TABLE and **rebuilds the table**, dropping manual indexes/PRAGMAs. Autogenerate misses CHECK constraint changes and some default-value changes. Every revision diff must be reviewed before commit; document in `cryoet_catalog/migrations/README.md`. Pre-MVP-DB upgrade tests assert per-table row counts to catch silent rebuild data loss.
 - **`init_schema` rewrite.** The three-branch logic must be tested against three real cases: empty DB, legacy DB matching baseline, legacy DB with `alembic_version` already present. Skipping any one of these can leave a developer's DB in a stamped-but-not-upgraded state.
-- **Phase 4.5 may surface scope changes.** If real-data integration uncovers parser issues or missing fields, frontend phases pause until backend fixes land. Schedule it on the calendar with that expectation.
+- **Phase 4.5 may surface scope changes.** ~~If real-data integration uncovers parser issues or missing fields, frontend phases pause until backend fixes land.~~ **Updated 2026-05-11 after running the checkpoint:** the checkpoint surfaced three findings — (#1) gouauxlab per-tilt MDOC parser bug; (#2) rosenlab EER-only with no zarr/`.st`; (#3) zero tomograms due to TOML coverage gaps. Finding #1 distorts the data model so it was promoted to **Phase 4.6 as a hard prereq for Phase 5**. Findings #2 and #3 only block the success path of preview/Neuroglancer endpoints (empty/error states are fine first-day UX) and stay tracked outside this plan. See Phase 4.5 + 4.6 sections in §10.
 - **Manual smoke checklist may rot.** Without Playwright, the README checklist is the only regression net. Plan to revisit once the surface area stabilizes.
 - **Zarr internal symlinks.** Path validation walks the top-level Zarr dir but doesn't validate every chunk inside. Document the "no external symlinks inside Zarr stores" expectation in the data-organization guide; not gated on enforcement code for MVP.
 
@@ -556,7 +582,7 @@ The original plan flagged a dozen open questions; all were settled before writin
 - "View in Neuroglancer" opens a working viewer in a new tab for at least one fixture tomogram and one fixture tilt series. Concurrent launches at capacity don't crash the API.
 - Running `pixi run scan` mutates the DB; the new `scan_run_id` appears on the `/scans` page (manual refresh) and in the home-page "Last scan" inline within the next page load.
 - `pixi run migrate` upgrades a pre-MVP DB matching the `0001` baseline to head without data loss; per-table row counts pre/post are equal.
-- Phase 4.5 integration checkpoint completed against real researcher data with no blocking issues.
+- Phase 4.5 integration checkpoint completed against real researcher data; findings logged and triaged. Phase 4.6 (gouauxlab per-tilt MDOC parser fix) lands before Phase 5. The other two upstream findings (rosenlab EER-only tilt-series, TOML coverage gaps for tomograms/annotations) are tracked outside this plan and do not block Phase 5–8. Golden-path demo (preview image + Neuroglancer launch on real data) additionally requires one of: (a) one rosenlab MDOC's EERs pre-rendered to zarr; (b) TOML cleanup unlocking ≥1 tomogram row; (c) `.st` reader added to the preview route.
 - API refuses to start without `CATALOG_DATA_ROOT`; preview/Neuroglancer routes 404 for paths outside it.
 - All new backend endpoints have unit tests passing under `pixi run test`.
 - The frontend boots cleanly under `pixi run frontend` and the API under `pixi run api` (with `--workers 1 --no-reload`) against a freshly scanned `cryoet_catalog.db`.
