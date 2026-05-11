@@ -15,6 +15,7 @@ data
 .claude/*
 !.claude/plans/
 
-
+# frontend
 node_modules
 dist
+.tanstack
