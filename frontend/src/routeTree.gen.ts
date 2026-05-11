@@ -9,9 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ScansRouteImport } from './routes/scans'
 import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SamplesIndexRouteImport } from './routes/samples/index'
+import { Route as SamplesSampleIdRouteImport } from './routes/samples/$sampleId'
 
+const ScansRoute = ScansRouteImport.update({
+  id: '/scans',
+  path: '/scans',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SamplesRoute = SamplesRouteImport.update({
   id: '/samples',
   path: '/samples',
@@ -22,35 +30,67 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SamplesIndexRoute = SamplesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SamplesRoute,
+} as any)
+const SamplesSampleIdRoute = SamplesSampleIdRouteImport.update({
+  id: '/$sampleId',
+  path: '/$sampleId',
+  getParentRoute: () => SamplesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/samples': typeof SamplesRoute
+  '/samples': typeof SamplesRouteWithChildren
+  '/scans': typeof ScansRoute
+  '/samples/$sampleId': typeof SamplesSampleIdRoute
+  '/samples/': typeof SamplesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/samples': typeof SamplesRoute
+  '/scans': typeof ScansRoute
+  '/samples/$sampleId': typeof SamplesSampleIdRoute
+  '/samples': typeof SamplesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/samples': typeof SamplesRoute
+  '/samples': typeof SamplesRouteWithChildren
+  '/scans': typeof ScansRoute
+  '/samples/$sampleId': typeof SamplesSampleIdRoute
+  '/samples/': typeof SamplesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/samples'
+  fullPaths: '/' | '/samples' | '/scans' | '/samples/$sampleId' | '/samples/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/samples'
-  id: '__root__' | '/' | '/samples'
+  to: '/' | '/scans' | '/samples/$sampleId' | '/samples'
+  id:
+    | '__root__'
+    | '/'
+    | '/samples'
+    | '/scans'
+    | '/samples/$sampleId'
+    | '/samples/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SamplesRoute: typeof SamplesRoute
+  SamplesRoute: typeof SamplesRouteWithChildren
+  ScansRoute: typeof ScansRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/scans': {
+      id: '/scans'
+      path: '/scans'
+      fullPath: '/scans'
+      preLoaderRoute: typeof ScansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/samples': {
       id: '/samples'
       path: '/samples'
@@ -65,12 +105,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/samples/': {
+      id: '/samples/'
+      path: '/'
+      fullPath: '/samples/'
+      preLoaderRoute: typeof SamplesIndexRouteImport
+      parentRoute: typeof SamplesRoute
+    }
+    '/samples/$sampleId': {
+      id: '/samples/$sampleId'
+      path: '/$sampleId'
+      fullPath: '/samples/$sampleId'
+      preLoaderRoute: typeof SamplesSampleIdRouteImport
+      parentRoute: typeof SamplesRoute
+    }
   }
 }
 
+interface SamplesRouteChildren {
+  SamplesSampleIdRoute: typeof SamplesSampleIdRoute
+  SamplesIndexRoute: typeof SamplesIndexRoute
+}
+
+const SamplesRouteChildren: SamplesRouteChildren = {
+  SamplesSampleIdRoute: SamplesSampleIdRoute,
+  SamplesIndexRoute: SamplesIndexRoute,
+}
+
+const SamplesRouteWithChildren =
+  SamplesRoute._addFileChildren(SamplesRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SamplesRoute: SamplesRoute,
+  SamplesRoute: SamplesRouteWithChildren,
+  ScansRoute: ScansRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
