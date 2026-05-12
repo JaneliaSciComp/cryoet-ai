@@ -25,10 +25,18 @@ For the schema itself, see `cryoet_schema/schema_info.md` (human reference) and 
 
 ## Setup
 
+**Note:** This setup guide assumes you are working on machine with access to the Janelia file system.
+
 1. [Install pixi](https://pixi.prefix.dev/latest/installation/).
 2. From the repo root, run `pixi install` to materialize the Python environments.
 
 The frontend's Node deps are installed automatically the first time you run `pixi run frontend` (and re-run only when `package.json` / `package-lock.json` change). You don't need a separate `npm install` step.
+
+3. Create the database. This will scan the scratch reorganized data located at `/groups/cryoet/cryoet/data/scratch/data` and create a SQLite database called `cryoet_catalog.db` in your repo root.
+
+```
+pixi run scan --init
+```
 
 ---
 
@@ -46,23 +54,7 @@ Serves `http://localhost:8000` with auto-reload. Swagger UI at `/docs`.
 ```
 pixi run frontend
 ```
-Serves `http://localhost:3000` (bound on all interfaces so the dev-container port forward works). The dev server proxies `/api/*` to FastAPI on `:8000`.
-
-The frontend also fetches FastAPI directly during SSR (route loaders run in Node and bypass the proxy) — make sure the API process is up before navigating to data routes.
-
-The catalog DB defaults to `sqlite:///cryoet_catalog.db` in the repo root. Override with the `CATALOG_DB_URL` env var.
-
----
-
-## Building the catalog
-
-Before the API has anything to serve, the scanner needs to walk a data root and populate the DB:
-
-```
-pixi run scan {data_root}
-```
-
-Re-run after researchers edit TOML files; the scanner is mtime-gated and idempotent. See `.claude/plans/2026-05-01-cryoet-catalog-scanner.md` for the full design.
+Open the data portal at `http://localhost:3000`.
 
 ---
 
