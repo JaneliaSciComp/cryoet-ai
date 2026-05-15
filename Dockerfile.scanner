@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1.7
+# Catalog scanner. Build context: repo root.
+#
+# Designed for one-shot execution: a k8s CronJob (or `docker compose run scanner`)
+# starts the container, it scans, it exits. `--init` is idempotent so the same
+# command works for first run and steady state.
+
+FROM ghcr.io/prefix-dev/pixi:0.66.0-bookworm-slim AS base
+WORKDIR /app
+
+FROM base AS deps
+COPY pixi.toml pixi.lock pyproject.toml ./
+RUN pixi install --locked -e catalog
+
+FROM base AS runtime
+COPY --from=deps /app/.pixi /app/.pixi
+COPY pixi.toml pixi.lock pyproject.toml ./
+COPY cryoet_schema ./cryoet_schema
+COPY cryoet_catalog ./cryoet_catalog
+
+ENV CATALOG_DATA_ROOT=/groups/cryoet/cryoet/data/scratch/data \
+    CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db
+
+CMD ["pixi", "run", "-e", "catalog", "scan", "--init"]

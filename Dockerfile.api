@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1.7
+# FastAPI read-only catalog API. Build context: repo root.
+#
+# Layer order is tuned for cache reuse: pixi.lock changes rarely, source
+# changes often. Keep the lockfile copy in its own early step.
+
+FROM ghcr.io/prefix-dev/pixi:0.66.0-bookworm-slim AS base
+WORKDIR /app
+
+# Resolve and materialize only the `api` environment from pixi.lock.
+FROM base AS deps
+COPY pixi.toml pixi.lock pyproject.toml ./
+RUN pixi install --locked -e api
+
+FROM base AS runtime
+COPY --from=deps /app/.pixi /app/.pixi
+COPY pixi.toml pixi.lock pyproject.toml ./
+COPY cryoet_schema ./cryoet_schema
+COPY cryoet_catalog ./cryoet_catalog
+
+# CATALOG_DATA_ROOT must match the path scanner used when writing the DB —
+# the API resolves DB-recorded paths against this and rejects anything outside.
+ENV CATALOG_DATA_ROOT=/groups/cryoet/cryoet/data/scratch/data \
+    CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db \
+    CORS_ORIGINS=http://localhost:3000
+
+EXPOSE 8000
+CMD ["pixi", "run", "-e", "api", "uvicorn", "cryoet_catalog.api.main:app", \
+     "--host", "0.0.0.0", "--port", "8000"]

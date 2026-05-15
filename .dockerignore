@@ -1,0 +1,37 @@
+# Pixi-resolved envs (rebuilt inside the image)
+.pixi
+
+# Python caches and test artifacts
+**/__pycache__
+.pytest_cache
+*.egg-info
+
+# Databases — never bake the local catalog DB into an image
+*.db
+*.db-journal
+
+# Frontend artifacts (frontend image uses its own context)
+frontend/node_modules
+frontend/dist
+frontend/.tanstack
+frontend/.env.local
+frontend/.env.*.local
+
+# VCS / IDE / Claude scratch
+.git
+.gitignore
+.gitattributes
+.github
+.claude
+.devcontainer
+.vscode
+.idea
+
+# Docs and tests aren't needed at runtime
+docs
+tests
+templates
+
+# OS junk
+.DS_Store
+Thumbs.db

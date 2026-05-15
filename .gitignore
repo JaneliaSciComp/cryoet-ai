@@ -21,3 +21,6 @@ dist
 .tanstack
 .env.local
 .env.*.local
+
+# env vars
+.env
