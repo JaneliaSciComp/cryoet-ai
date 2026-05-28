@@ -98,6 +98,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 |---|---|---|---|
 | `scheme` | text | `sample.toml` (`[milling]`) | [researcher: milling scheme] |
 | `date` | date | `sample.toml` (`[milling]`) | YYYY-MM-DD. [researcher: date] |
+| `quality` | text | `sample.toml` (`[milling]`) | |
 
 ### 1f. Simulation sub-entity (one row per sample when `data_source = simulation`)
 

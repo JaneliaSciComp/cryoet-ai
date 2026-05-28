@@ -186,6 +186,7 @@ class Freezing(_Base):
 class Milling(_Base):
     scheme: str | None = None
     date: _dt.date | None = None
+    quality: str | None = None
 
 
 class Acquisition(_Base):

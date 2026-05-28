@@ -110,5 +110,6 @@ project     = "<FILL IN>"     # enum: synapse | chromatin
 # ── Milling  (uncomment and fill in) ────
 
 # [milling]
-# scheme = "<FILL IN>"   # text, e.g. cryo-FIB
-# date   = "<FILL IN>"   # date, YYYY-MM-DD
+# scheme    = "<FILL IN>"   # text, e.g. cryo-FIB
+# date      = "<FILL IN>"   # date, YYYY-MM-DD
+# quality   = "<FILL IN>"   # text, comment on FIB quality

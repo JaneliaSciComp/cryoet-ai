@@ -338,6 +338,10 @@
           "title": "Date",
           "format": "date",
           "type": "string"
+        },
+        "quality": {
+          "title": "Quality",
+          "type": "string"
         }
       },
       "title": "Milling",
