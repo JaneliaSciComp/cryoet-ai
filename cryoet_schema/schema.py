@@ -197,6 +197,14 @@ class Milling(_Base):
     quality: str | None = None
 
 
+class MdRun(_Base):
+    # directory / sample.toml [[md_run]] (folder name = md_run_id = TOML `id`);
+    # one directory per run under {sample_dir}/md_runs/{id}. Simulation data only.
+    md_run_id: IdStr = Field(alias="id")
+    seed: int | None = None
+    computer: str | None = None
+
+
 class Acquisition(_Base):
     # directory (acquisition folder name, injected on load)
     acquisition_id: IdStr | None = None
@@ -278,11 +286,19 @@ class Annotation(_Base):
     files: list[str] = Field(default_factory=list)
 
 
+class MdSource(_Base):
+    # acquisition.toml ([md_source]) — simulation provenance for this acquisition.
+    # md_run_id must match an [[md_run]] id in the sample's sample.toml.
+    md_run_id: IdStr | None = None
+    frame: int | None = None                          # frame/snapshot index
+
+
 class AcquisitionFile(_Base):
     """Parsed contents of one acquisition.toml."""
 
     acquisition: Acquisition
     tilt_series: TiltSeries | None = None
+    md_source: MdSource | None = None
     raw_tomogram: RawTomogram | None = None
     post_processed_tomogram: list[PostProcessedTomogram] = Field(default_factory=list)
     annotation: list[Annotation] = Field(default_factory=list)
@@ -335,16 +351,44 @@ class SampleRecord(_Base):
     fiducial: Fiducial | None = None
     freezing: Freezing | None = None
     milling: Milling | None = None
+    md_run: list[MdRun] = Field(default_factory=list)
     acquisitions: dict[str, AcquisitionFile] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _check_project_blocks(self) -> "SampleRecord":
         if self.sample.project == Project.synapse and self.chromatin is not None:
             raise ValueError("sample.project is 'synapse' but a [chromatin] block is present")
-        if self.sample.data_source == DataSource.experimental and self.simulation is not None:
-            raise ValueError(
-                "sample.data_source is 'experimental' but a [simulation] block is present"
-            )
+        if self.sample.data_source == DataSource.experimental:
+            if self.simulation is not None:
+                raise ValueError(
+                    "sample.data_source is 'experimental' but a [simulation] block is present"
+                )
+            if self.md_run:
+                raise ValueError(
+                    "sample.data_source is 'experimental' but [[md_run]] block(s) are present"
+                )
+            acqs_with_md = [
+                aid for aid, af in self.acquisitions.items() if af.md_source is not None
+            ]
+            if acqs_with_md:
+                raise ValueError(
+                    "sample.data_source is 'experimental' but acquisition(s) "
+                    f"{acqs_with_md} have an [md_source] block"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _check_md_run_id_collisions(self) -> "SampleRecord":
+        # Duplicate md_run ids are a sample.toml integrity problem (no single
+        # acquisition to blame), so they fail the whole sample, like
+        # cross-acquisition name collisions. The acquisition -> md_run
+        # *reference* check is a cross-file concern handled per-acquisition in
+        # the loader so a dangling ref isolates to that one acquisition.
+        problems = _case_insensitive_duplicates(
+            (r.md_run_id for r in self.md_run), "md_run id"
+        )
+        if problems:
+            raise ValueError("; ".join(problems))
         return self
 
     @model_validator(mode="after")

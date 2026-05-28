@@ -19,6 +19,8 @@ from cryoet_schema import (
     Chromatin,
     DataSource,
     Freezing,
+    MdRun,
+    MdSource,
     Milling,
     PostProcessedTomogram,
     Project,
@@ -44,8 +46,10 @@ _ENTITY_MODELS = [
     Fiducial,
     Freezing,
     Milling,
+    MdRun,
     Acquisition,
     TiltSeries,
+    MdSource,
     RawTomogram,
     PostProcessedTomogram,
     Annotation,
@@ -60,6 +64,55 @@ def test_starter_templates_in_sync():
             f"{copy.relative_to(_REPO_ROOT)} differs from "
             f"{canonical.relative_to(_REPO_ROOT)}. "
             "Run `pixi run sync-templates` to regenerate."
+        )
+
+
+# The empty-directory layout each starter skeleton ships, relative to its
+# sample root. This is the only thing that distinguishes the experimental and
+# simulation skeletons (their TOML contents are identical) and mirrors the two
+# layouts documented under "Proposed directory structure" in README.md.
+_SKELETON_DIRS = {
+    "sample_name_experimental": {
+        "acquisition_name/Frames",
+        "acquisition_name/Gains",
+        "acquisition_name/TiltSeries",
+        "acquisition_name/Alignments",
+        "acquisition_name/Reconstructions/Tomograms/processing_pipeline_id",
+        "acquisition_name/Reconstructions/Annotations/annotation_id",
+    },
+    "sample_name_simulation": {
+        "md_runs/md_run_id/Trajectories",
+        "md_runs/md_run_id/Snapshots",
+        "acquisition_name/TiltSeries",
+        "acquisition_name/Reconstructions/Tomograms/processing_pipeline_id",
+        "acquisition_name/Reconstructions/Annotations/annotation_id",
+    },
+}
+
+
+def test_starter_skeletons_match_documented_layout():
+    """Each starter skeleton must ship exactly the empty directories the
+    README documents for its data arm — no missing, extra, or drifted folders.
+
+    Guards the experimental/simulation split: simulation drops the movie-frame
+    folders (``Frames``/``Gains``/``Alignments``) and adds ``md_runs/``.
+    """
+    templates = _REPO_ROOT / "templates"
+    for skeleton, expected in _SKELETON_DIRS.items():
+        root = templates / skeleton
+        assert root.is_dir(), f"missing starter skeleton {root}"
+        # Leaf directories only: a directory with no subdirectories. Comparing
+        # leaves keeps the assertion stable against the intermediate dirs
+        # (e.g. Reconstructions/) that are implied by their children.
+        leaves = {
+            str(p.relative_to(root).as_posix())
+            for p in root.rglob("*")
+            if p.is_dir() and not any(c.is_dir() for c in p.iterdir())
+        }
+        assert leaves == expected, (
+            f"{skeleton}/ directory layout drifted from README. "
+            f"Missing: {sorted(expected - leaves)}; "
+            f"unexpected: {sorted(leaves - expected)}."
         )
 
 

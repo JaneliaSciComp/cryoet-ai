@@ -73,6 +73,15 @@ project         = "<FILL IN>"   # enum: synapse | chromatin | nanogold
 # dataset_type = "<FILL IN>"   # text, e.g. single_molecule | slab | bulk
 
 
+# ── MD runs  (simulation data only; copy the block for each run) ─────────────
+# Each [[md_run]] id MUST match a directory under {sample_dir}/md_runs/{id}.
+
+# [[md_run]]
+# id       = "<FILL IN>"   # text, MUST match a directory name under md_runs/
+# seed     = "<FILL IN>"   # integer, RNG seed for the run
+# computer = "<FILL IN>"   # text, name of the computer used
+
+
 # ── Gold nanoparticle labeling (uncomment and fill in) ──────────
 # Copy-paste this block to add as many [[label]] entries as you have targets
 

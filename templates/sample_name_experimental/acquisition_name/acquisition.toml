@@ -44,6 +44,13 @@
 # microscope    = "<FILL IN>"   # text, model name, e.g. "Titan Krios", "Glacios"
 # quality       = "<FILL IN>"   # text, e.g., "high", "medium", "low"
 
+# ── MD source  (simulation data only) ────────────────────────────────────────
+# Which MD run + frame this acquisition's synthetic data came from.
+
+# [md_source]
+# md_run_id = "<FILL IN>"   # text, MUST match an [[md_run]] id in sample.toml
+# frame     = "<FILL IN>"   # integer, frame/snapshot index in the MD run
+
 # ════════════════════════════════════════════════════════════════
 # SECTION 2 — Processing log
 # Append entries below as tilt series, tomograms and annotations are produced.

@@ -385,6 +385,130 @@ def test_tomogram_derived_from_unknown(tmp_path):
     assert "acq1" not in result.record.acquisitions
 
 
+def test_md_source_valid_reference(tmp_path):
+    """A simulation acquisition referencing a declared md_run validates clean."""
+    _write(
+        tmp_path / "sample.toml",
+        """
+        [sample]
+        data_source = "simulation"
+        project = "chromatin"
+
+        [[md_run]]
+        id = "run_a"
+        seed = 42
+        computer = "gpu01"
+        """,
+    )
+    _write(
+        tmp_path / "acq1" / "acquisition.toml",
+        """
+        [acquisition]
+
+        [md_source]
+        md_run_id = "run_a"
+        frame = 1500
+        """,
+    )
+    result = load_sample_record(tmp_path)
+    assert result.sample_errors == []
+    assert result.acquisition_errors == {}
+    assert result.record is not None
+    acq = result.record.acquisitions["acq1"]
+    assert acq.md_source.md_run_id == "run_a"
+    assert acq.md_source.frame == 1500
+
+
+def test_md_source_dangling_md_run_id_isolates(tmp_path):
+    """A dangling md_run_id fails only that acquisition, not the whole sample."""
+    _write(
+        tmp_path / "sample.toml",
+        """
+        [sample]
+        data_source = "simulation"
+        project = "chromatin"
+
+        [[md_run]]
+        id = "run_a"
+        """,
+    )
+    _write(
+        tmp_path / "acq_good" / "acquisition.toml",
+        """
+        [acquisition]
+
+        [md_source]
+        md_run_id = "run_a"
+        frame = 1
+        """,
+    )
+    _write(
+        tmp_path / "acq_bad" / "acquisition.toml",
+        """
+        [acquisition]
+
+        [md_source]
+        md_run_id = "ghost"
+        frame = 2
+        """,
+    )
+    result = load_sample_record(tmp_path)
+    # Sample still loads; only the bad acquisition is excluded (isolation).
+    assert result.record is not None
+    assert result.sample_errors == []
+    assert "acq_good" in result.record.acquisitions
+    assert "acq_bad" not in result.record.acquisitions
+    assert "acq_bad" in result.acquisition_errors
+    assert "ghost" in result.acquisition_errors["acq_bad"]
+    assert "md_run" in result.acquisition_errors["acq_bad"]
+
+
+def test_md_run_on_experimental_rejected(tmp_path):
+    """[[md_run]] on an experimental sample fails the whole sample."""
+    _write(
+        tmp_path / "sample.toml",
+        """
+        [sample]
+        data_source = "experimental"
+        project = "chromatin"
+
+        [[md_run]]
+        id = "run_a"
+        """,
+    )
+    result = load_sample_record(tmp_path)
+    assert result.record is None
+    assert any("md_run" in e and "experimental" in e for e in result.sample_errors)
+
+
+def test_md_source_on_experimental_rejected(tmp_path):
+    """An [md_source] block on an experimental sample fails the whole sample
+    (not isolated) — the dangling-ref isolation path is simulation-only."""
+    _write(
+        tmp_path / "sample.toml",
+        """
+        [sample]
+        data_source = "experimental"
+        project = "chromatin"
+        """,
+    )
+    _write(
+        tmp_path / "acq1" / "acquisition.toml",
+        """
+        [acquisition]
+
+        [md_source]
+        md_run_id = "x"
+        frame = 1
+        """,
+    )
+    result = load_sample_record(tmp_path)
+    assert result.record is None
+    assert any(
+        "md_source" in e and "experimental" in e for e in result.sample_errors
+    )
+
+
 def test_multiple_acquisitions(tmp_path):
     _minimal_sample(tmp_path)
     _minimal_acquisition(tmp_path, "acq_a")

@@ -1,14 +1,20 @@
 """Sync the starter-directory template copies from the canonical templates.
 
-There are two on-disk copies of each researcher template:
+There are multiple on-disk copies of each researcher template:
 
 - the standalone copies under ``templates/`` (canonical), and
-- the starter-directory copies under ``templates/sample_name/`` that a
-  researcher copies wholesale to begin a new sample.
+- the starter-directory copies under ``templates/sample_name_experimental/``
+  and ``templates/sample_name_simulation/`` that a researcher copies
+  wholesale to begin a new sample. The two skeletons differ only in their
+  empty-directory layout (experimental has ``Frames/``/``Gains/``/
+  ``Alignments/``; simulation has ``md_runs/`` and no movie-frame folders) —
+  the ``sample.toml`` / ``acquisition.toml`` contents are identical across
+  both, so each canonical template fans out to both skeletons.
 
-Both must stay identical. This script regenerates the starter copies from
-the canonical ones. ``tests/test_repo_consistency.py`` asserts they match,
-so a forgotten sync fails the test suite.
+All copies must stay identical to their canonical source. This script
+regenerates the starter copies from the canonical ones.
+``tests/test_repo_consistency.py`` asserts they match, so a forgotten sync
+fails the test suite.
 
 Usage:
     pixi run sync-templates          # rewrite the starter copies
@@ -24,16 +30,24 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # canonical (source) -> starter copy (generated). Keep these paths in sync
-# with the directory layout documented in README.md.
+# with the directory layout documented in README.md. Each canonical template
+# fans out to both the experimental and simulation starter skeletons.
+_TEMPLATES = _REPO_ROOT / "templates"
+_STARTER_SKELETONS = ("sample_name_experimental", "sample_name_simulation")
+
 TEMPLATE_PAIRS: list[tuple[Path, Path]] = [
-    (
-        _REPO_ROOT / "templates" / "sample.toml",
-        _REPO_ROOT / "templates" / "sample_name" / "sample.toml",
-    ),
-    (
-        _REPO_ROOT / "templates" / "acquisition.toml",
-        _REPO_ROOT / "templates" / "sample_name" / "acquisition_name" / "acquisition.toml",
-    ),
+    pair
+    for skeleton in _STARTER_SKELETONS
+    for pair in (
+        (
+            _TEMPLATES / "sample.toml",
+            _TEMPLATES / skeleton / "sample.toml",
+        ),
+        (
+            _TEMPLATES / "acquisition.toml",
+            _TEMPLATES / skeleton / "acquisition_name" / "acquisition.toml",
+        ),
+    )
 ]
 
 

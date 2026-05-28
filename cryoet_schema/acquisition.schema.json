@@ -123,6 +123,21 @@
       "title": "Annotation",
       "type": "object"
     },
+    "MdSource": {
+      "additionalProperties": true,
+      "properties": {
+        "md_run_id": {
+          "title": "Md Run Id",
+          "type": "string"
+        },
+        "frame": {
+          "title": "Frame",
+          "type": "integer"
+        }
+      },
+      "title": "MdSource",
+      "type": "object"
+    },
     "PostProcessedTomogram": {
       "additionalProperties": true,
       "properties": {
@@ -279,6 +294,9 @@
     },
     "tilt_series": {
       "$ref": "#/$defs/TiltSeries"
+    },
+    "md_source": {
+      "$ref": "#/$defs/MdSource"
     },
     "raw_tomogram": {
       "$ref": "#/$defs/RawTomogram"

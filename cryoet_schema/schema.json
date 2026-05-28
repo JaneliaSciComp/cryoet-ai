@@ -104,6 +104,9 @@
         "tilt_series": {
           "$ref": "#/$defs/TiltSeries"
         },
+        "md_source": {
+          "$ref": "#/$defs/MdSource"
+        },
         "raw_tomogram": {
           "$ref": "#/$defs/RawTomogram"
         },
@@ -335,6 +338,43 @@
         }
       },
       "title": "Label",
+      "type": "object"
+    },
+    "MdRun": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "computer": {
+          "title": "Computer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MdRun",
+      "type": "object"
+    },
+    "MdSource": {
+      "additionalProperties": true,
+      "properties": {
+        "md_run_id": {
+          "title": "Md Run Id",
+          "type": "string"
+        },
+        "frame": {
+          "title": "Frame",
+          "type": "integer"
+        }
+      },
+      "title": "MdSource",
       "type": "object"
     },
     "Milling": {
@@ -585,6 +625,13 @@
     },
     "milling": {
       "$ref": "#/$defs/Milling"
+    },
+    "md_run": {
+      "items": {
+        "$ref": "#/$defs/MdRun"
+      },
+      "title": "Md Run",
+      "type": "array"
     },
     "acquisitions": {
       "additionalProperties": {

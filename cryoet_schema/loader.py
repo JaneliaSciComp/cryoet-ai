@@ -30,6 +30,7 @@ from pydantic import BaseModel, ValidationError
 
 from cryoet_schema import (
     AcquisitionFile,
+    DataSource,
     Sample,
     SampleRecord,
 )
@@ -120,6 +121,29 @@ def _format_validation_errors(prefix: str, exc: ValidationError) -> list[str]:
     return out
 
 
+def _md_source_ref_error(
+    acq: AcquisitionFile, valid_md_run_ids: set[str]
+) -> str | None:
+    """Error string if the acquisition's ``md_source.md_run_id`` is set but
+    matches no ``[[md_run]]`` id declared in ``sample.toml``.
+
+    This is the one reference that crosses files (acquisition.toml ->
+    sample.toml), so it can't live on ``AcquisitionFile`` and isn't enforced
+    at ``SampleRecord`` level (which would fail the whole sample). The loader
+    checks it during the per-acquisition pass and routes a dangling ref to
+    that acquisition's ``acquisition_errors``, preserving isolation.
+    """
+    src = acq.md_source
+    if src is None or src.md_run_id is None:
+        return None
+    if src.md_run_id not in valid_md_run_ids:
+        return (
+            f"md_source.md_run_id '{src.md_run_id}' does not match any "
+            f"[[md_run]] id in sample.toml"
+        )
+    return None
+
+
 def _format_extras_location(entry: ExtrasEntry) -> str:
     """Flatten an ExtrasEntry to a human-readable path.
 
@@ -135,12 +159,18 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
     if et == "label":
         # entity_pk = (sample_id, index)
         return f"label[{pk[1]}]"
+    if et == "md_run":
+        # entity_pk = (sample_id, md_run_id)
+        return f"md_run[{pk[1]}]"
     if et == "acquisition":
         # entity_pk = (sample_id, acq_id)
         return f"acquisitions.{pk[1]}.acquisition"
     if et == "tilt_series":
         # entity_pk = (sample_id, acq_id)
         return f"acquisitions.{pk[1]}.tilt_series"
+    if et == "md_source":
+        # entity_pk = (sample_id, acq_id)
+        return f"acquisitions.{pk[1]}.md_source"
     if et == "raw_tomogram":
         # entity_pk = (sample_id, acq_id, tomogram_id)
         return f"acquisitions.{pk[1]}.raw_tomogram"
@@ -182,6 +212,11 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
         for k, v in (label.model_extra or {}).items():
             out.append(ExtrasEntry("label", (sample_id, i), k, v))
 
+    # md_run - id-keyed (folder name), like tomograms
+    for run in record.md_run:
+        for k, v in (run.model_extra or {}).items():
+            out.append(ExtrasEntry("md_run", (sample_id, run.md_run_id), k, v))
+
     # acquisitions - dict
     for acq_id, acq_file in record.acquisitions.items():
         # AcquisitionFile.model_extra itself is intentionally NOT walked.
@@ -191,6 +226,11 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
             for k, v in (acq_file.tilt_series.model_extra or {}).items():
                 out.append(
                     ExtrasEntry("tilt_series", (sample_id, acq_id), k, v)
+                )
+        if acq_file.md_source is not None:
+            for k, v in (acq_file.md_source.model_extra or {}).items():
+                out.append(
+                    ExtrasEntry("md_source", (sample_id, acq_id), k, v)
                 )
         if acq_file.raw_tomogram is not None:
             raw = acq_file.raw_tomogram
@@ -278,6 +318,16 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
     if sample_model is None:
         return result
 
+    # md_run ids declared in sample.toml (raw, by TOML `id` alias). Used to
+    # validate each acquisition's md_source reference below. A malformed or
+    # duplicate md_run id is caught later by SampleRecord validation and fails
+    # the whole sample; here we only need the declared id set.
+    valid_md_run_ids = {
+        run["id"]
+        for run in sample_data.get("md_run", [])
+        if isinstance(run, dict) and isinstance(run.get("id"), str)
+    }
+
     # Per-acquisition: parse, strip placeholders, validate independently.
     validated_acqs: dict[str, AcquisitionFile] = {}
     for acq_toml in sorted(sample_dir.glob("*/acquisition.toml")):
@@ -307,7 +357,18 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
                 result.warnings.append(str(w.message))
 
         if acq_model is not None:
-            validated_acqs[acq_name] = acq_model
+            # The dangling-md_run-ref check only applies to simulation samples.
+            # On experimental samples an md_source block is a category error
+            # (no md_runs exist), left for SampleRecord to reject whole-sample
+            # with a clear message — don't pre-empt it here with a misleading
+            # "no matching md_run" error.
+            ref_error = None
+            if sample_model.data_source == DataSource.simulation:
+                ref_error = _md_source_ref_error(acq_model, valid_md_run_ids)
+            if ref_error is not None:
+                result.acquisition_errors[acq_name] = ref_error
+            else:
+                validated_acqs[acq_name] = acq_model
 
     # Build the full record. Pass already-validated acquisitions through
     # by dumping back to dict (preserves alias round-tripping for the

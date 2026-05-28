@@ -14,10 +14,11 @@ The central design goal is answering one question across both the experimental a
 | `cryoet_schema/acquisition.schema.json` | JSON Schema for a single `acquisition.toml` on its own (the `AcquisitionFile` model), generated from `schema.py`. Used by `acquisition.toml`'s `#:schema` directive so editors can validate it without requiring the sample-level fields. |
 | `cryoet_schema/validate.py` | Validator: `pixi run validate {sample_dir}`. |
 | `cryoet_schema/generate_json_schema.py` | Regenerates both `schema.json` and `acquisition.schema.json` from the Pydantic models: `pixi run json-schema`. |
-| `templates/sample_name` | Starter directory structure containing `sample.toml` and `acquistion.toml`. Copy this directory to start a new sample. |
-| `templates/sample.toml` | Starter template for `sample.toml`. If you didn't start a new sample from the starter directory `sample_name/`, copy this template into your sample directory and fill in. |
-| `templates/acquisition.toml` | Starter template for `acquisition.toml`. If you didn't start a new sample from the starter directory `sample_name/`, copy this template into each acquisition directory and fill in. |
-| `cryoet_schema/sync_templates.py` | Regenerates the `templates/sample_name/` starter copies from the canonical `templates/*.toml`: `pixi run sync-templates`. |
+| `templates/sample_name_experimental` | Starter directory structure for an **experimental** (cryoET) sample, containing `sample.toml` and `acquisition.toml`. Copy this directory to start a new experimental sample. |
+| `templates/sample_name_simulation` | Starter directory structure for a **simulation** (MD + synthetic cryoET) sample. Same `sample.toml`/`acquisition.toml`, but the layout adds `md_runs/` and drops the movie-frame folders (`Frames/`, `Gains/`, `Alignments/`). Copy this directory to start a new simulation sample. |
+| `templates/sample.toml` | Starter template for `sample.toml`. If you didn't start a new sample from one of the starter directories, copy this template into your sample directory and fill in. |
+| `templates/acquisition.toml` | Starter template for `acquisition.toml`. If you didn't start a new sample from one of the starter directories, copy this template into each acquisition directory and fill in. |
+| `cryoet_schema/sync_templates.py` | Regenerates the starter-directory copies (`templates/sample_name_experimental/` and `templates/sample_name_simulation/`) from the canonical `templates/*.toml`: `pixi run sync-templates`. |
 | `pyproject.toml` / `pixi.lock` | Project metadata, PyPI dependencies (`[project]`), and pixi config (`[tool.pixi.*]`). Pixi resolves the duplicated runtime deps from conda-forge; `tests/test_deps_in_sync.py` enforces that the two lists stay aligned.  |
 
 ---
@@ -57,20 +58,30 @@ The central design goal is answering one question across both the experimental a
           *.mrc / *.zarr
 ```
 
-### MD simulation data
+### MD simulation (sample) and associated synthetic cyroET (acquistions) data
 
 ```
 {sample_name}/
   sample.toml                                # sample-level conditions + simulation params
-  {acquisition_name}/
-    acquisition.toml                         # per-acquisition params + processing log
-    Trajectories/                            # raw simulation output
-    Snapshots/                               # extracted conformations
-    SyntheticCryoET/                         # simulated tomograms generated from snapshots
-      {processing_id}/
-        *.mrc
-        *.zarr
+  md_runs/                                   # simulation only: one subfolder per MD run
+    {md_run_id}/                             # name = [[md_run]].id in sample.toml
+      Trajectories/                          # raw simulation output
+      Snapshots/                             # extracted conformations (frames)
+  {acquisition_name}/                        # synthetic cryoET from one md_run frame
+    acquisition.toml                         # per-acquisition params + [md_source]
+    TiltSeries/
+    Reconstructions/
+      Tomograms/
+        {processing_id}/                     # one subfolder per processing pipeline
+          *.mrc
+          *.zarr
+      Annotations/
+        {annotation_id}/
+          *.star
+          *.mrc / *.zarr
 ```
+
+For simulation samples, the raw MD data lives under `md_runs/{md_run_id}/` — one subfolder per `[[md_run]]` block in `sample.toml`, holding that run's trajectories and extracted frames. Each acquisition is the synthetic cryoET generated from a single frame of one run; its directory sits at the top level alongside `md_runs/` (the same level as experimental acquisitions), and its `[md_source]` block records which `md_run_id` and `frame` it came from. The `md_run_id` must match one of the sample's `[[md_run]]` ids; both `[[md_run]]` and `[md_source]` are rejected on experimental samples.
 
 The directory skeleton is adapted from the [CZI CryoET Data Portal](https://chanzuckerberg.github.io/cryoet-data-portal/stable/cryoet_data_portal_docsite_data.html) at the Sample > Acquisition > (Frames, Gains, TiltSeries, Alignments, Reconstructions) level, with three deliberate departures:
 
@@ -169,7 +180,7 @@ Skipping the editor setup is fine — `pixi run validate {sample_dir}` (step 5) 
 
 ### 1. Lay out the sample directory
 
-Copy the starter directory, `scratch/templates/sample_name/` into the `data/` directory. The starter directory contains empty directories to scaffold the correct directory structure. Then following the naming instructions below.
+Copy the starter directory that matches your data arm — `scratch/templates/sample_name_experimental/` for experimental cryoET data or `scratch/templates/sample_name_simulation/` for MD + synthetic cryoET data — into the `data/` directory. The starter directory contains empty directories to scaffold the correct directory structure. Then following the naming instructions below.
 
 Replace `sample_name` with the desired sample id.
 

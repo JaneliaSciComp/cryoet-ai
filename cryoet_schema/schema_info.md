@@ -107,6 +107,16 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 |---|---|---|---|
 | `dataset_type` | text | `sample.toml` (`[simulation]`) | e.g. `single_molecule` / `slab` / `bulk`. |
 
+### 1g. MD run sub-entity (0..N per sample; simulation data only)
+
+`sample.toml` (`[[md_run]]`) — one entry per molecular-dynamics run. Each `md_run_id` MUST match a directory under `{sample_dir}/md_runs/{id}` (a simulation-only directory variation that holds that run's trajectories and frames). Rejected on `experimental` samples.
+
+| Field | Type | Source | Notes / researcher mapping |
+|---|---|---|---|
+| `md_run_id` | text (PK) | `directory` ↔ `sample.toml` (`[[md_run]].id`) | Run folder name under `md_runs/`; the TOML `id` must match the folder. |
+| `seed` | integer | `sample.toml` (`[[md_run]]`) | RNG seed for the run. |
+| `computer` | text | `sample.toml` (`[[md_run]]`) | Name of the computer used. |
+
 ---
 
 ## 2. Acquisition entity
@@ -147,6 +157,15 @@ One row per imaging position. Primary key: `(sample_id, acquisition_id)`.
 |---|---|---|---|
 | `software` | text | `acquisition.toml` (`[tilt_series]`) | Alignment/reconstruction software for the tilt series. |
 | `pixel_size` | float | `acquisition.toml` (`[tilt_series]`) | Ångström. Researcher-stated tilt-series pixel size (distinct from the MDOC `pixel_size` on the acquisition row). |
+
+### 2b. MD source sub-entity (one per acquisition; simulation data only)
+
+`acquisition.toml` (`[md_source]`) — records which MD run + frame this acquisition's synthetic data came from. Rejected on `experimental` samples.
+
+| Field | Type | Source | Notes / researcher mapping |
+|---|---|---|---|
+| `md_run_id` | text (FK) | `acquisition.toml` (`[md_source]`) | MUST match an `md_run_id` in the sample's `sample.toml` `[[md_run]]`. |
+| `frame` | integer | `acquisition.toml` (`[md_source]`) | Frame/snapshot index within the MD run. |
 
 ---
 
