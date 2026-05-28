@@ -39,11 +39,11 @@
 # ════════════════════════════════════════════════════════════════
 
 [sample]
-data_source = "<FILL IN>"     # enum: experimental | simulation
-project     = "<FILL IN>"     # enum: synapse | chromatin
-# type        = "<FILL IN>"   # text, e.g. tissue | cellular | reconstituted
-# cell_type   = "<FILL IN>"   # text, required if type = "cellular"
-# description = "<FILL IN>"   # text, optional free-text description
+data_source     = "<FILL IN>"   # enum: experimental | simulation
+project         = "<FILL IN>"   # enum: synapse | chromatin | nanogold
+# type          = "<FILL IN>"   # text, e.g. tissue | cellular | reconstituted
+# cell_type     = "<FILL IN>"   # text, required if type = "cellular"
+# description   = "<FILL IN>"   # text, optional free-text description
 
 
 # ── Chromatin-specific  (delete this block if project = "synapse") ───────────

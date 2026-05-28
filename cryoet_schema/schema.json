@@ -350,7 +350,8 @@
     "Project": {
       "enum": [
         "chromatin",
-        "synapse"
+        "synapse",
+        "nanogold"
       ],
       "title": "Project",
       "type": "string"

@@ -120,6 +120,7 @@ class DataSource(str, Enum):
 class Project(str, Enum):
     chromatin = "chromatin"
     synapse = "synapse"
+    nanogold = "nanogold"
 
 
 class Sample(_Base):
