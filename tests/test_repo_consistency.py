@@ -22,7 +22,6 @@ from cryoet_schema import (
     Project,
     Sample,
     Simulation,
-    Synapse,
     Tomogram,
 )
 from cryoet_schema.sync_templates import TEMPLATE_PAIRS
@@ -38,7 +37,6 @@ _ENTITY_MODELS = [
     Sample,
     Simulation,
     Chromatin,
-    Synapse,
     Aunp,
     Freezing,
     Milling,

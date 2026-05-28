@@ -156,11 +156,6 @@ class Chromatin(_Base):
     linker_length_fraction: float | None = None
 
 
-class Synapse(_Base):
-    label_target: str | None = None
-    label_strategy: str | None = None
-
-
 class Aunp(_Base):
     size_nm: float | None = None
     type: str | None = None
@@ -285,7 +280,6 @@ class SampleRecord(_Base):
     sample: Sample
     simulation: Simulation | None = None
     chromatin: Chromatin | None = None
-    synapse: Synapse | None = None
     aunp: list[Aunp] = Field(default_factory=list)
     freezing: Freezing | None = None
     milling: Milling | None = None
@@ -293,8 +287,6 @@ class SampleRecord(_Base):
 
     @model_validator(mode="after")
     def _check_project_blocks(self) -> "SampleRecord":
-        if self.sample.project == Project.chromatin and self.synapse is not None:
-            raise ValueError("sample.project is 'chromatin' but a [synapse] block is present")
         if self.sample.project == Project.synapse and self.chromatin is not None:
             raise ValueError("sample.project is 'synapse' but a [chromatin] block is present")
         if self.sample.data_source == DataSource.experimental and self.simulation is not None:

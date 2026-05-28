@@ -196,24 +196,6 @@ def test_typo_warning_preserved_when_validation_fails(tmp_path):
     assert any("descriptiom" in w and "description" in w for w in typo_warnings)
 
 
-def test_project_block_mismatch_synapse_on_chromatin(tmp_path):
-    _write(
-        tmp_path / "sample.toml",
-        """
-        [sample]
-        data_source = "experimental"
-        project = "chromatin"
-
-        [synapse]
-        label_target = "AMPA"
-        label_strategy = "single_label"
-        """,
-    )
-    result = load_sample_record(tmp_path)
-    assert result.record is None
-    assert any("chromatin" in e and "synapse" in e for e in result.sample_errors)
-
-
 def test_simulation_block_rejected_for_cryoet(tmp_path):
     _write(
         tmp_path / "sample.toml",

@@ -12,7 +12,6 @@ from .schema import (
     Sample,
     SampleRecord,
     Simulation,
-    Synapse,
     Tomogram,
 )
 
@@ -30,6 +29,5 @@ __all__ = [
     "Sample",
     "SampleRecord",
     "Simulation",
-    "Synapse",
     "Tomogram",
 ]

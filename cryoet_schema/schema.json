@@ -358,21 +358,6 @@
       "title": "Simulation",
       "type": "object"
     },
-    "Synapse": {
-      "additionalProperties": true,
-      "properties": {
-        "label_target": {
-          "title": "Label Target",
-          "type": "string"
-        },
-        "label_strategy": {
-          "title": "Label Strategy",
-          "type": "string"
-        }
-      },
-      "title": "Synapse",
-      "type": "object"
-    },
     "Tomogram": {
       "additionalProperties": true,
       "properties": {
@@ -453,9 +438,6 @@
     },
     "chromatin": {
       "$ref": "#/$defs/Chromatin"
-    },
-    "synapse": {
-      "$ref": "#/$defs/Synapse"
     },
     "aunp": {
       "items": {

@@ -53,14 +53,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 | `nucleosome_footprint` | list | `sample.toml` (`[chromatin]`) | Native-substrate only. [researcher: nucleosome footprint] |
 | `linker_length_fraction` | float | `derived` | `sequence_footprint − 1`; computed on ingest. [researcher: linker length (size footprint-1)] |
 
-### 1b. Synapse sub-entity (one row per sample when `project = synapse`)
-
-| Field | Type | Source | Notes |
-|---|---|---|---|
-| `label_target` | text | `sample.toml` (`[synapse]`) | e.g. glutamate_receptor, AMPA. |
-| `label_strategy` | text | `sample.toml` (`[synapse]`) | e.g. single_label, dual_label. |
-
-### 1c. AuNP labeling sub-entity (0..N per sample)
+### 1b. AuNP labeling sub-entity (0..N per sample)
 
 [researcher: Gold NP's]
 
@@ -75,7 +68,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 | `conjugation_target` | text | `sample.toml` (`[aunp]`) | e.g. GluA2. [researcher: Conjugation partner target] |
 | `notes` | text | `sample.toml` (`[aunp]`) | |
 
-### 1d. Freezing sub-entity (one per sample)
+### 1c. Freezing sub-entity (one per sample)
 
 [researcher: Freezing conditions]
 
@@ -87,7 +80,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 | `planchette_size` | text | `sample.toml` (`[freezing]`) | HPF only. [researcher: planchette size] |
 | `spacer_thickness` | text | `sample.toml` (`[freezing]`) | HPF only. [researcher: spacer thickness] |
 
-### 1e. Milling sub-entity (one per sample)
+### 1d. Milling sub-entity (one per sample)
 
 [researcher: Milling]
 
@@ -96,7 +89,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 | `scheme` | text | `sample.toml` (`[milling]`) | [researcher: milling scheme] |
 | `date` | date | `sample.toml` (`[milling]`) | YYYY-MM-DD. [researcher: date] |
 
-### 1f. Simulation sub-entity (one row per sample when `data_source = simulation`)
+### 1e. Simulation sub-entity (one row per sample when `data_source = simulation`)
 
 | Field | Type | Source | Notes / researcher mapping |
 |---|---|---|---|
