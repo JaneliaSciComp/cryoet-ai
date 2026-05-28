@@ -319,11 +319,11 @@ def test_acquisition_with_tomogram_and_annotation(tmp_path):
         [acquisition]
         resolution = 3.5
 
-        [[tomogram]]
+        [raw_tomogram]
         id = "tomo_001"
         pipeline = "AreTomo"
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "tomo_002"
         derived_from = ["tomo_001"]
 
@@ -337,7 +337,8 @@ def test_acquisition_with_tomogram_and_annotation(tmp_path):
     assert result.acquisition_errors == {}
     assert result.record is not None
     acq = result.record.acquisitions["acq1"]
-    assert [t.tomogram_id for t in acq.tomogram] == ["tomo_001", "tomo_002"]
+    assert acq.raw_tomogram.tomogram_id == "tomo_001"
+    assert [t.tomogram_id for t in acq.post_processed_tomogram] == ["tomo_002"]
     assert acq.annotation[0].target_tomogram == "tomo_001"
 
 
@@ -349,7 +350,7 @@ def test_annotation_target_tomogram_missing(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [raw_tomogram]
         id = "tomo_001"
 
         [[annotation]]
@@ -372,7 +373,7 @@ def test_tomogram_derived_from_unknown(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "tomo_001"
         derived_from = ["ghost"]
         """,

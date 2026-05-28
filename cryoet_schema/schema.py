@@ -224,15 +224,33 @@ class Acquisition(_Base):
     camera: str | None = None
 
 
-class Tomogram(_Base):
-    # directory / acquisition.toml [[tomogram]] (folder name = tomogram_id = TOML `id`)
+class RawTomogram(_Base):
+    # directory / acquisition.toml [raw_tomogram] (folder name = tomogram_id = TOML `id`)
     tomogram_id: IdStr = Field(alias="id")
     pipeline: str | None = None
     software: str | None = None
-    voxel_bin: int | None = None
+    voxel_size: float | None = None                   # angstrom
     derived_from: list[IdStr] = Field(default_factory=list)
-    # derived
-    is_raw: bool | None = None                        # derived_from == []
+    # MRC header
+    image_size_x: int | None = None
+    image_size_y: int | None = None
+    image_size_z: int | None = None
+    # directory (prescribed layout)
+    mrc_path: str | None = None
+    zarr_path: str | None = None
+    # OME-Zarr .zattrs
+    zarr_axes: str | None = None
+    zarr_scale: list[float] | None = None
+
+
+class PostProcessedTomogram(_Base):
+    # directory / acquisition.toml [[post_processed_tomogram]] (folder name = tomogram_id = TOML `id`)
+    tomogram_id: IdStr = Field(alias="id")
+    denoising_software: str | None = None
+    ctf_software: str | None = None
+    missing_wedge_software: str | None = None
+    voxel_size: float | None = None                   # angstrom
+    derived_from: list[IdStr] = Field(default_factory=list)
     # MRC header
     image_size_x: int | None = None
     image_size_y: int | None = None
@@ -258,20 +276,28 @@ class AcquisitionFile(_Base):
     """Parsed contents of one acquisition.toml."""
 
     acquisition: Acquisition
-    tomogram: list[Tomogram] = Field(default_factory=list)
+    raw_tomogram: RawTomogram | None = None
+    post_processed_tomogram: list[PostProcessedTomogram] = Field(default_factory=list)
     annotation: list[Annotation] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_cross_refs(self) -> "AcquisitionFile":
-        tomo_ids = {t.tomogram_id for t in self.tomogram}
+        # Raw and post-processed tomograms share one id namespace: derived_from
+        # and annotation.target_tomogram may reference either.
+        tomograms: list[RawTomogram | PostProcessedTomogram] = list(
+            self.post_processed_tomogram
+        )
+        if self.raw_tomogram is not None:
+            tomograms.insert(0, self.raw_tomogram)
+        tomo_ids = {t.tomogram_id for t in tomograms}
         problems: list[str] = []
         problems.extend(_case_insensitive_duplicates(
-            (t.tomogram_id for t in self.tomogram), "tomogram id"
+            (t.tomogram_id for t in tomograms), "tomogram id"
         ))
         problems.extend(_case_insensitive_duplicates(
             (a.annotation_id for a in self.annotation), "annotation id"
         ))
-        for t in self.tomogram:
+        for t in tomograms:
             for ref in t.derived_from:
                 if ref not in tomo_ids:
                     problems.append(

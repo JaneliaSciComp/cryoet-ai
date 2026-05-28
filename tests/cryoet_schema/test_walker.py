@@ -97,17 +97,17 @@ def test_unknown_key_on_tomogram_uses_id_not_index(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "first_tomo"
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "my_tomo"
         unknown_tomo_key = "value"
         """,
     )
     result = load_sample_record(tmp_path)
     assert result.record is not None
-    entry = _find(result.extras, "tomogram", "unknown_tomo_key")
+    entry = _find(result.extras, "post_processed_tomogram", "unknown_tomo_key")
     assert entry is not None
     # Must be id-keyed, not list-index-keyed.
     assert entry.entity_pk == (tmp_path.name, "Position_86", "my_tomo")

@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 from pydantic import ValidationError
 
-from cryoet_schema import Sample, Tomogram
+from cryoet_schema import PostProcessedTomogram, Sample
 from cryoet_schema.schema import _validate_id
 from cryoet_schema.loader import load_sample_record
 
@@ -131,12 +131,12 @@ def test_sample_allows_none_sample_id():
 
 def test_tomogram_rejects_bad_id_alias():
     with pytest.raises(ValidationError):
-        Tomogram.model_validate({"id": "has space"})
+        PostProcessedTomogram.model_validate({"id": "has space"})
 
 
 def test_tomogram_rejects_bad_derived_from():
     with pytest.raises(ValidationError):
-        Tomogram.model_validate({"id": "tomo_001", "derived_from": ["also/bad"]})
+        PostProcessedTomogram.model_validate({"id": "tomo_001", "derived_from": ["also/bad"]})
 
 
 # ── integration through load_sample_record ──────────────────────────────────
@@ -216,10 +216,10 @@ def test_tomogram_case_insensitive_collision(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "tomo_001"
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "Tomo_001"
         """,
     )
@@ -227,7 +227,7 @@ def test_tomogram_case_insensitive_collision(tmp_path):
     assert result.record is not None
     assert "acq1" in result.acquisition_errors
     msg = result.acquisition_errors["acq1"]
-    assert "collides case-insensitively" in msg and "tomogram" in msg
+    assert "collides case-insensitively" in msg and "tomogram id" in msg
     assert "acq1" not in result.record.acquisitions
 
 
@@ -246,7 +246,7 @@ def test_annotation_case_insensitive_collision(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "tomo_001"
 
         [[annotation]]
@@ -278,7 +278,7 @@ def test_tomogram_and_annotation_sharing_id_is_allowed(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "shared_id"
 
         [[annotation]]
@@ -292,7 +292,7 @@ def test_tomogram_and_annotation_sharing_id_is_allowed(tmp_path):
 
 
 def test_bad_tomogram_id_in_toml(tmp_path):
-    """Bad tomogram id is a per-acquisition failure under the new isolation rules."""
+    """Bad post_processed_tomogram id is a per-acquisition failure under the new isolation rules."""
     _write(
         tmp_path / "sample.toml",
         """
@@ -306,7 +306,7 @@ def test_bad_tomogram_id_in_toml(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [[post_processed_tomogram]]
         id = "has space"
         """,
     )
@@ -314,5 +314,5 @@ def test_bad_tomogram_id_in_toml(tmp_path):
     assert result.record is not None
     assert "acq1" in result.acquisition_errors
     msg = result.acquisition_errors["acq1"]
-    assert "tomogram" in msg.lower() and "id" in msg.lower()
+    assert "post_processed_tomogram" in msg.lower() and "id" in msg.lower()
     assert "acq1" not in result.record.acquisitions

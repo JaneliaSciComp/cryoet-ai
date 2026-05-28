@@ -40,7 +40,7 @@ def test_one_bad_acquisition_does_not_block_the_rest(tmp_path):
         """
         [acquisition]
 
-        [[tomogram]]
+        [raw_tomogram]
         id = "tomo_001"
 
         [[annotation]]

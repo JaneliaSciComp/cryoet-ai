@@ -20,10 +20,11 @@ from cryoet_schema import (
     DataSource,
     Freezing,
     Milling,
+    PostProcessedTomogram,
     Project,
+    RawTomogram,
     Sample,
     Simulation,
-    Tomogram,
 )
 from cryoet_schema.sync_templates import TEMPLATE_PAIRS
 
@@ -43,7 +44,8 @@ _ENTITY_MODELS = [
     Freezing,
     Milling,
     Acquisition,
-    Tomogram,
+    RawTomogram,
+    PostProcessedTomogram,
     Annotation,
 ]
 

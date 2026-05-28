@@ -43,8 +43,8 @@ class ExtrasEntry:
     """One top-level unknown key on a validated entity.
 
     ``entity_type`` is the lowercase table-name string (``"sample"``,
-    ``"chromatin"``, ``"label"``, ``"acquisition"``, ``"tomogram"``,
-    ``"annotation"``, …). ``entity_pk`` is the parent row's PK as a tuple
+    ``"chromatin"``, ``"label"``, ``"acquisition"``, ``"raw_tomogram"``,
+    ``"post_processed_tomogram"``, ``"annotation"``, …). ``entity_pk`` is the parent row's PK as a tuple
     of native Python values (e.g. ``("my_sample",)`` for ``chromatin``,
     ``("my_sample", 2)`` for the third label entry, ``("my_sample",
     "Position_86", "my_tomo")`` for a tomogram). ``key`` is the unknown
@@ -138,9 +138,12 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
     if et == "acquisition":
         # entity_pk = (sample_id, acq_id)
         return f"acquisitions.{pk[1]}.acquisition"
-    if et == "tomogram":
+    if et == "raw_tomogram":
         # entity_pk = (sample_id, acq_id, tomogram_id)
-        return f"acquisitions.{pk[1]}.tomogram[{pk[2]}]"
+        return f"acquisitions.{pk[1]}.raw_tomogram"
+    if et == "post_processed_tomogram":
+        # entity_pk = (sample_id, acq_id, tomogram_id)
+        return f"acquisitions.{pk[1]}.post_processed_tomogram[{pk[2]}]"
     if et == "annotation":
         # entity_pk = (sample_id, acq_id, annotation_id)
         return f"acquisitions.{pk[1]}.annotation[{pk[2]}]"
@@ -153,8 +156,8 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
 def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
     """Walk ``record`` and emit one ExtrasEntry per top-level unknown key.
 
-    Per-container PK rules per §4.4.1. Reaches into ``Tomogram.tomogram_id``
-    / ``Annotation.annotation_id`` for the child PK rather than using the
+    Per-container PK rules per §4.4.1. Reaches into the tomogram /
+    ``Annotation.annotation_id`` for the child PK rather than using the
     list index — this is a regression-tested invariant.
     """
     out: list[ExtrasEntry] = []
@@ -181,11 +184,22 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
         # AcquisitionFile.model_extra itself is intentionally NOT walked.
         for k, v in (acq_file.acquisition.model_extra or {}).items():
             out.append(ExtrasEntry("acquisition", (sample_id, acq_id), k, v))
-        for tomo in acq_file.tomogram:
+        if acq_file.raw_tomogram is not None:
+            raw = acq_file.raw_tomogram
+            for k, v in (raw.model_extra or {}).items():
+                out.append(
+                    ExtrasEntry(
+                        "raw_tomogram", (sample_id, acq_id, raw.tomogram_id), k, v
+                    )
+                )
+        for tomo in acq_file.post_processed_tomogram:
             for k, v in (tomo.model_extra or {}).items():
                 out.append(
                     ExtrasEntry(
-                        "tomogram", (sample_id, acq_id, tomo.tomogram_id), k, v
+                        "post_processed_tomogram",
+                        (sample_id, acq_id, tomo.tomogram_id),
+                        k,
+                        v,
                     )
                 )
         for ann in acq_file.annotation:
@@ -289,7 +303,7 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
 
     # Build the full record. Pass already-validated acquisitions through
     # by dumping back to dict (preserves alias round-tripping for the
-    # Tomogram / Annotation `id` alias) and re-validating end-to-end so
+    # tomogram / annotation `id` alias) and re-validating end-to-end so
     # that SampleRecord-level model validators (project/data_source
     # cross-checks, acquisition-name collisions) run against assembled
     # state.

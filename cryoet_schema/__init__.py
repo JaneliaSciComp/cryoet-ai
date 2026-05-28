@@ -9,11 +9,12 @@ from .schema import (
     Freezing,
     IdStr,
     Milling,
+    PostProcessedTomogram,
     Project,
+    RawTomogram,
     Sample,
     SampleRecord,
     Simulation,
-    Tomogram,
 )
 
 __all__ = [
@@ -27,9 +28,10 @@ __all__ = [
     "Freezing",
     "IdStr",
     "Milling",
+    "PostProcessedTomogram",
     "Project",
+    "RawTomogram",
     "Sample",
     "SampleRecord",
     "Simulation",
-    "Tomogram",
 ]

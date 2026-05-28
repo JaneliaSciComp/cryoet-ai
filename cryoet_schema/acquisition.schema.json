@@ -123,24 +123,28 @@
       "title": "Annotation",
       "type": "object"
     },
-    "Tomogram": {
+    "PostProcessedTomogram": {
       "additionalProperties": true,
       "properties": {
         "id": {
           "title": "Id",
           "type": "string"
         },
-        "pipeline": {
-          "title": "Pipeline",
+        "denoising_software": {
+          "title": "Denoising Software",
           "type": "string"
         },
-        "software": {
-          "title": "Software",
+        "ctf_software": {
+          "title": "Ctf Software",
           "type": "string"
         },
-        "voxel_bin": {
-          "title": "Voxel Bin",
-          "type": "integer"
+        "missing_wedge_software": {
+          "title": "Missing Wedge Software",
+          "type": "string"
+        },
+        "voxel_size": {
+          "title": "Voxel Size",
+          "type": "number"
         },
         "derived_from": {
           "items": {
@@ -148,10 +152,6 @@
           },
           "title": "Derived From",
           "type": "array"
-        },
-        "is_raw": {
-          "title": "Is Raw",
-          "type": "boolean"
         },
         "image_size_x": {
           "title": "Image Size X",
@@ -188,7 +188,71 @@
       "required": [
         "id"
       ],
-      "title": "Tomogram",
+      "title": "PostProcessedTomogram",
+      "type": "object"
+    },
+    "RawTomogram": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "pipeline": {
+          "title": "Pipeline",
+          "type": "string"
+        },
+        "software": {
+          "title": "Software",
+          "type": "string"
+        },
+        "voxel_size": {
+          "title": "Voxel Size",
+          "type": "number"
+        },
+        "derived_from": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Derived From",
+          "type": "array"
+        },
+        "image_size_x": {
+          "title": "Image Size X",
+          "type": "integer"
+        },
+        "image_size_y": {
+          "title": "Image Size Y",
+          "type": "integer"
+        },
+        "image_size_z": {
+          "title": "Image Size Z",
+          "type": "integer"
+        },
+        "mrc_path": {
+          "title": "Mrc Path",
+          "type": "string"
+        },
+        "zarr_path": {
+          "title": "Zarr Path",
+          "type": "string"
+        },
+        "zarr_axes": {
+          "title": "Zarr Axes",
+          "type": "string"
+        },
+        "zarr_scale": {
+          "title": "Zarr Scale",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "RawTomogram",
       "type": "object"
     }
   },
@@ -198,11 +262,14 @@
     "acquisition": {
       "$ref": "#/$defs/Acquisition"
     },
-    "tomogram": {
+    "raw_tomogram": {
+      "$ref": "#/$defs/RawTomogram"
+    },
+    "post_processed_tomogram": {
       "items": {
-        "$ref": "#/$defs/Tomogram"
+        "$ref": "#/$defs/PostProcessedTomogram"
       },
-      "title": "Tomogram",
+      "title": "Post Processed Tomogram",
       "type": "array"
     },
     "annotation": {

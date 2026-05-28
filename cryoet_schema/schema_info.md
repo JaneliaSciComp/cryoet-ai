@@ -141,24 +141,52 @@ One row per imaging position. Primary key: `(sample_id, acquisition_id)`.
 
 ---
 
-## 3. Tomogram entity
+## 3. Tomogram entities
 
 [researcher: Processing level → Raw tomogram / Processed tomograms]
 
-One row per tomogram output. Primary key: `(sample_id, acquisition_id, tomogram_id)`.
+Raw and post-processed tomograms are split into two tables. They share one
+`tomogram_id` namespace within an acquisition: `derived_from` and an
+annotation's `target_tomogram` may reference either a raw or a post-processed
+tomogram in the same `acquisition.toml`.
+
+### 3a. Raw tomogram (one row per acquisition, optional)
+
+`acquisition.toml` (`[raw_tomogram]`) — at most one per acquisition. Primary key: `(sample_id, acquisition_id, tomogram_id)`.
 
 | Field | Type | Source | Notes / researcher mapping |
 |---|---|---|---|
-| `tomogram_id` | text (PK) | `directory` ↔ `acquisition.toml` (`[[tomogram]].id`) | Processing folder name, e.g. `bp_3dctf_bin4`; the TOML `id` must match the folder. [researcher: Processing Steps] |
+| `tomogram_id` | text (PK) | `directory` ↔ `acquisition.toml` (`[raw_tomogram].id`) | Processing folder name, e.g. `bp_3dctf_bin4`; the TOML `id` must match the folder. [researcher: Processing Steps] |
 | `acquisition_id` | text (FK) | `directory` | Parent acquisition folder name. |
 | `sample_id` | text (FK) | `directory` | Parent sample folder name. |
-| `pipeline` | text | `acquisition.toml` (`[[tomogram]]`) | Human description. [researcher: Processing Steps] |
-| `software` | text | `acquisition.toml` (`[[tomogram]]`) | [researcher: software] |
-| `voxel_bin` | integer | `acquisition.toml` (`[[tomogram]]`) | |
-| `voxel_spacing_angstrom` | float | `MRC header` | DB-only column populated by the catalog scanner from the MRC header's `voxel_size.x`; not authored in any TOML. |
-| `voxel_spacing_angstrom_implied` | float | `derived` | DB-only column: `pixel_size × voxel_bin` when both are available, NULL otherwise. Exists for queryability of cross-source disagreements. |
-| `derived_from` | list[text] | `acquisition.toml` (`[[tomogram]]`) | Lineage; empty for raw reconstructions. |
-| `is_raw` | boolean | `derived` | `derived_from == []`. [researcher: Raw tomogram flag] |
+| `pipeline` | text | `acquisition.toml` (`[raw_tomogram]`) | Human description. [researcher: Processing Steps] |
+| `software` | text | `acquisition.toml` (`[raw_tomogram]`) | [researcher: software] |
+| `voxel_size` | float | `acquisition.toml` (`[raw_tomogram]`) | Ångström. Researcher-stated voxel spacing. |
+| `voxel_spacing_angstrom` | float | `MRC header` | DB-only column populated by the catalog scanner from the MRC header's `voxel_size.x`; not authored in any TOML. Cross-check against the authored `voxel_size`. |
+| `derived_from` | list[text] | `acquisition.toml` (`[raw_tomogram]`) | Lineage; empty for raw reconstructions. |
+| `image_size_x` | integer | `MRC header` | [researcher: image size] |
+| `image_size_y` | integer | `MRC header` | |
+| `image_size_z` | integer | `MRC header` | |
+| `mrc_path` | text | `directory` | Derived from prescribed layout. |
+| `zarr_path` | text | `directory` | Derived from prescribed layout. |
+| `zarr_axes` | text | `OME-Zarr .zattrs` | Axis order. |
+| `zarr_scale` | list[float] | `OME-Zarr .zattrs` | Multiscale scale factors. |
+
+### 3b. Post-processed tomogram (0..N per acquisition)
+
+`acquisition.toml` (`[[post_processed_tomogram]]`) — one entry per processing output. Primary key: `(sample_id, acquisition_id, tomogram_id)`.
+
+| Field | Type | Source | Notes / researcher mapping |
+|---|---|---|---|
+| `tomogram_id` | text (PK) | `directory` ↔ `acquisition.toml` (`[[post_processed_tomogram]].id`) | Processing folder name; the TOML `id` must match the folder. [researcher: Processing Steps] |
+| `acquisition_id` | text (FK) | `directory` | Parent acquisition folder name. |
+| `sample_id` | text (FK) | `directory` | Parent sample folder name. |
+| `denoising_software` | text | `acquisition.toml` (`[[post_processed_tomogram]]`) | [researcher: software] |
+| `ctf_software` | text | `acquisition.toml` (`[[post_processed_tomogram]]`) | [researcher: software] |
+| `missing_wedge_software` | text | `acquisition.toml` (`[[post_processed_tomogram]]`) | [researcher: software] |
+| `voxel_size` | float | `acquisition.toml` (`[[post_processed_tomogram]]`) | Ångström. Researcher-stated voxel spacing. |
+| `voxel_spacing_angstrom` | float | `MRC header` | DB-only column populated by the catalog scanner from the MRC header's `voxel_size.x`; not authored in any TOML. Cross-check against the authored `voxel_size`. |
+| `derived_from` | list[text] | `acquisition.toml` (`[[post_processed_tomogram]]`) | Lineage; references a raw or post-processed `tomogram_id` in this acquisition. |
 | `image_size_x` | integer | `MRC header` | [researcher: image size] |
 | `image_size_y` | integer | `MRC header` | |
 | `image_size_z` | integer | `MRC header` | |

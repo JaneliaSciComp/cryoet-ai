@@ -29,7 +29,7 @@ The central design goal is answering one question across both the experimental a
 1. Edit `cryoet_schema/schema.py` and the canonical template(s) — `templates/sample.toml` / `templates/acquisition.toml`.
 2. Run `pixi run sync` to regenerate the derived artifacts: `schema.json`, `acquisition.schema.json`, and the `templates/sample_name/` starter copies.
 3. Update `cryoet_schema/schema_info.md` (it documents every stored field, including DB-only ones not in any TOML).
-4. Run `pixi run test`. The drift guards in `tests/test_repo_consistency.py` and `tests/test_generate_json_schema.py` fail with a fix hint if the generated schemas, starter copies, doc, or the README claims below are out of date.
+4. Run `pixi run test -- tests/test_repo_consistency.py tests/test_generate_json_schema.py`. The drift guards in `tests/test_repo_consistency.py` and `tests/test_generate_json_schema.py` fail with a fix hint if the generated schemas, starter copies, doc, or the README claims below are out of date.
 
 ---
 
@@ -76,7 +76,7 @@ The directory skeleton is adapted from the [CZI CryoET Data Portal](https://chan
 
 - **Two metadata files per sample.** Sample-level conditions live in `sample.toml` at the sample root. Per-acquisition parameters and the processing log live in `{acquisition}/acquisition.toml`. Fields derivable from MDOC files and file headers are authored in neither file; the ingest pipeline will read them directly.
 - **Tomograms are kept in per-pipeline subfolders** (e.g., `bp_3dctf_bin4/`, `bp_3dctf_bin4_ddw/`) rather than flattened into `Tomograms/`. This avoids filename collisions when new processing versions are added, and the folder name acts as the `processing_id`.
-- **No `VoxelSpacing{N}/` subfolder.** Voxel binning is recorded directly in `acquisition.toml` (as `voxel_bin` on each `[[tomogram]]` entry); the absolute voxel spacing in Ångström is read from the MRC header by the catalog scanner. Keeping voxel info out of the path avoids duplicating information that lives in the file itself.
+- **No `VoxelSpacing{N}/` subfolder.** Voxel spacing in Ångström is recorded directly in `acquisition.toml` (as `voxel_size` on the `[raw_tomogram]` and each `[[post_processed_tomogram]]` entry); the catalog scanner also reads the value straight from the MRC header for cross-checking. Keeping voxel info out of the path avoids duplicating information that lives in the file itself.
 
 Simulation data uses a parallel structure with domain-appropriate folder names. Both share the same schema, which is what makes cross-comparison possible.
 
@@ -93,7 +93,7 @@ One file per sample, placed at the root of the sample directory. Contains only w
 One file per acquisition, placed at the root of each acquisition directory. It contains:
 
 1. Researcher-authored imaging parameters not available from MDOC files (nominal resolution, nominal tilt spacing, target defocus range, energy filter model, phase plate, microscope model).
-2. A **processing log**: `[[tomogram]]` and `[[annotation]]` entries appended over time as processing produces new outputs.
+2. A **processing log**: a `[raw_tomogram]` table plus `[[post_processed_tomogram]]` and `[[annotation]]` entries appended over time as processing produces new outputs.
 
 The acquisition directory name *is* the acquisition's identity, so `acquisition.id` is omitted from the file.
 
@@ -138,16 +138,16 @@ Each Pydantic model is configured with `extra="allow"`, so unknown keys are pres
 ```toml
 # In .../Position_86/acquisition.toml
 
-# Raw reconstruction
-[[tomogram]]
+# Raw reconstruction (at most one [raw_tomogram] per acquisition)
+[raw_tomogram]
 id                     = "bp_3dctf_bin4"
-voxel_bin              = 4
+voxel_size             = 4.0
 derived_from           = []
 
 # Denoised version derived from the raw
-[[tomogram]]
+[[post_processed_tomogram]]
 id                     = "bp_3dctf_bin4_ddw"
-voxel_bin              = 4
+voxel_size             = 4.0
 derived_from           = ["bp_3dctf_bin4"]
 
 # Segmentation run on the denoised tomogram
@@ -197,7 +197,7 @@ gouauxlab_20250418_AMmilled29-2/
 
 ### 4. Append to the processing log as outputs are produced
 
-Each `acquisition.toml` grows over time. For each new output — a new tomogram reconstruction, a denoised version, a segmentation, an STA result — append a new `[[tomogram]]` or `[[annotation]]` entry to the relevant acquisition's file.
+Each `acquisition.toml` grows over time. Record the raw reconstruction once in `[raw_tomogram]`; for each new output — a denoised version, a segmentation, an STA result — append a new `[[post_processed_tomogram]]` or `[[annotation]]` entry to the relevant acquisition's file.
 
 **Rules:**
 - Do **not** delete or modify a tomogram or annotation entry once added. Reprocessing produces a **new** entry with a new `id`, placed at the bottom of the file.
