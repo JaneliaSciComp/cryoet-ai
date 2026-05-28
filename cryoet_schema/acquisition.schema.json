@@ -254,6 +254,21 @@
       ],
       "title": "RawTomogram",
       "type": "object"
+    },
+    "TiltSeries": {
+      "additionalProperties": true,
+      "properties": {
+        "software": {
+          "title": "Software",
+          "type": "string"
+        },
+        "pixel_size": {
+          "title": "Pixel Size",
+          "type": "number"
+        }
+      },
+      "title": "TiltSeries",
+      "type": "object"
     }
   },
   "additionalProperties": true,
@@ -261,6 +276,9 @@
   "properties": {
     "acquisition": {
       "$ref": "#/$defs/Acquisition"
+    },
+    "tilt_series": {
+      "$ref": "#/$defs/TiltSeries"
     },
     "raw_tomogram": {
       "$ref": "#/$defs/RawTomogram"

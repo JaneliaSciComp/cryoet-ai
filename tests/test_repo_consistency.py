@@ -25,6 +25,7 @@ from cryoet_schema import (
     RawTomogram,
     Sample,
     Simulation,
+    TiltSeries,
 )
 from cryoet_schema.sync_templates import TEMPLATE_PAIRS
 
@@ -44,6 +45,7 @@ _ENTITY_MODELS = [
     Freezing,
     Milling,
     Acquisition,
+    TiltSeries,
     RawTomogram,
     PostProcessedTomogram,
     Annotation,

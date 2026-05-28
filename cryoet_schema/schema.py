@@ -224,6 +224,12 @@ class Acquisition(_Base):
     camera: str | None = None
 
 
+class TiltSeries(_Base):
+    # acquisition.toml ([tilt_series]) — one per acquisition
+    software: str | None = None
+    pixel_size: float | None = None                   # angstrom
+
+
 class RawTomogram(_Base):
     # directory / acquisition.toml [raw_tomogram] (folder name = tomogram_id = TOML `id`)
     tomogram_id: IdStr = Field(alias="id")
@@ -276,6 +282,7 @@ class AcquisitionFile(_Base):
     """Parsed contents of one acquisition.toml."""
 
     acquisition: Acquisition
+    tilt_series: TiltSeries | None = None
     raw_tomogram: RawTomogram | None = None
     post_processed_tomogram: list[PostProcessedTomogram] = Field(default_factory=list)
     annotation: list[Annotation] = Field(default_factory=list)

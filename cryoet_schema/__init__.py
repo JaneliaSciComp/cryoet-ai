@@ -15,6 +15,7 @@ from .schema import (
     Sample,
     SampleRecord,
     Simulation,
+    TiltSeries,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "Sample",
     "SampleRecord",
     "Simulation",
+    "TiltSeries",
 ]

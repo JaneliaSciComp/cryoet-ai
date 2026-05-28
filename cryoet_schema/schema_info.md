@@ -139,6 +139,15 @@ One row per imaging position. Primary key: `(sample_id, acquisition_id)`.
 | `camera` | text | `.eer` / `.tiff` | Derived from frame extension (`.eer` → Falcon; `.tiff` → K3). [researcher: Camera] |
 | `frame_count` | integer | `MDOC` | Number of tilts. |
 
+### 2a. Tilt series sub-entity (one per acquisition)
+
+`acquisition.toml` (`[tilt_series]`) — the aligned tilt series produced from the frames.
+
+| Field | Type | Source | Notes / researcher mapping |
+|---|---|---|---|
+| `software` | text | `acquisition.toml` (`[tilt_series]`) | Alignment/reconstruction software for the tilt series. |
+| `pixel_size` | float | `acquisition.toml` (`[tilt_series]`) | Ångström. Researcher-stated tilt-series pixel size (distinct from the MDOC `pixel_size` on the acquisition row). |
+
 ---
 
 ## 3. Tomogram entities

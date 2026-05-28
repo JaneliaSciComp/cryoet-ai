@@ -46,10 +46,14 @@
 
 # ════════════════════════════════════════════════════════════════
 # SECTION 2 — Processing log
-# Append entries below as tomograms and annotations are produced.
+# Append entries below as tilt series, tomograms and annotations are produced.
 # Copy-paste the [[post_processed_tomogram]] and [[annotation]] blocks so there is one for each produced
 # These start empty — add them as processing happens.
 # ════════════════════════════════════════════════════════════════
+
+[tilt_series]
+software    = "<FILL IN>"   # text
+pixel_size  = "<FILL IN>"   # float, Angstrom
 
 # [raw_tomogram]
 # id            = "<FILL IN>"   # text, MUST equal the tomogram's folder name

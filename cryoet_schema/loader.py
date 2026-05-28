@@ -138,6 +138,9 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
     if et == "acquisition":
         # entity_pk = (sample_id, acq_id)
         return f"acquisitions.{pk[1]}.acquisition"
+    if et == "tilt_series":
+        # entity_pk = (sample_id, acq_id)
+        return f"acquisitions.{pk[1]}.tilt_series"
     if et == "raw_tomogram":
         # entity_pk = (sample_id, acq_id, tomogram_id)
         return f"acquisitions.{pk[1]}.raw_tomogram"
@@ -184,6 +187,11 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
         # AcquisitionFile.model_extra itself is intentionally NOT walked.
         for k, v in (acq_file.acquisition.model_extra or {}).items():
             out.append(ExtrasEntry("acquisition", (sample_id, acq_id), k, v))
+        if acq_file.tilt_series is not None:
+            for k, v in (acq_file.tilt_series.model_extra or {}).items():
+                out.append(
+                    ExtrasEntry("tilt_series", (sample_id, acq_id), k, v)
+                )
         if acq_file.raw_tomogram is not None:
             raw = acq_file.raw_tomogram
             for k, v in (raw.model_extra or {}).items():
