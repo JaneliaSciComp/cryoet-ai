@@ -17,7 +17,19 @@ The central design goal is answering one question across both the experimental a
 | `templates/sample_name` | Starter directory structure containing `sample.toml` and `acquistion.toml`. Copy this directory to start a new sample. |
 | `templates/sample.toml` | Starter template for `sample.toml`. If you didn't start a new sample from the starter directory `sample_name/`, copy this template into your sample directory and fill in. |
 | `templates/acquisition.toml` | Starter template for `acquisition.toml`. If you didn't start a new sample from the starter directory `sample_name/`, copy this template into each acquisition directory and fill in. |
+| `cryoet_schema/sync_templates.py` | Regenerates the `templates/sample_name/` starter copies from the canonical `templates/*.toml`: `pixi run sync-templates`. |
 | `pyproject.toml` / `pixi.lock` | Project metadata, PyPI dependencies (`[project]`), and pixi config (`[tool.pixi.*]`). Pixi resolves the duplicated runtime deps from conda-forge; `tests/test_deps_in_sync.py` enforces that the two lists stay aligned.  |
+
+---
+
+## Maintaining the schema
+
+`schema.py` is the single source of truth for field definitions. When changing a field:
+
+1. Edit `cryoet_schema/schema.py` and the canonical template(s) — `templates/sample.toml` / `templates/acquisition.toml`.
+2. Run `pixi run sync` to regenerate the derived artifacts: `schema.json`, `acquisition.schema.json`, and the `templates/sample_name/` starter copies.
+3. Update `cryoet_schema/schema_info.md` (it documents every stored field, including DB-only ones not in any TOML).
+4. Run `pixi run test`. The drift guards in `tests/test_repo_consistency.py` and `tests/test_generate_json_schema.py` fail with a fix hint if the generated schemas, starter copies, doc, or the README claims below are out of date.
 
 ---
 

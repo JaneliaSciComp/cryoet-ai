@@ -37,6 +37,9 @@ rapidfuzz = ">=3.0"
 [tool.pixi.tasks]
 validate = "python -m cryoet_schema.validate"
 json-schema = "python -m cryoet_schema.generate_json_schema"
+sync-templates = "python -m cryoet_schema.sync_templates"
+# Regenerate every artifact derived from schema.py + the canonical templates.
+sync = { depends-on = ["json-schema", "sync-templates"] }
 
 [tool.pixi.feature.test.dependencies]
 pytest = ">=7.0"
