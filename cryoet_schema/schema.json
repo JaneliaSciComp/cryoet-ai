@@ -257,7 +257,7 @@
     },
     "DataSource": {
       "enum": [
-        "cryoet",
+        "experimental",
         "simulation"
       ],
       "title": "DataSource",

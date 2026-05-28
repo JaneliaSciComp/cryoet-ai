@@ -21,7 +21,7 @@ def _minimal_sample(root: Path, *, project: str = "chromatin") -> Path:
         root / "sample.toml",
         f"""
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "{project}"
         """,
     )
@@ -70,7 +70,7 @@ def test_minimal_valid_sample(tmp_path):
     assert result.acquisition_errors == {}
     assert result.warnings == []
     assert result.record is not None
-    assert result.record.sample.data_source.value == "cryoet"
+    assert result.record.sample.data_source.value == "experimental"
     assert result.record.sample.project.value == "chromatin"
     assert result.record.sample.sample_id == tmp_path.name
     assert result.record.acquisitions == {}
@@ -81,7 +81,7 @@ def test_missing_required_field(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         """,
     )
     result = load_sample_record(tmp_path)
@@ -108,7 +108,7 @@ def test_extra_field_no_typo_only_generic_warning(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         totally_unrelated_key = "foo"
         """,
@@ -127,7 +127,7 @@ def test_extra_field_typo_produces_suggestion(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         descriptiom = "typo here"
         """,
@@ -147,7 +147,7 @@ def test_typo_on_nested_model(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [chromatin]
@@ -181,7 +181,7 @@ def test_typo_warning_preserved_when_validation_fails(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         descriptiom = "typo alongside a hard error"
 
@@ -201,7 +201,7 @@ def test_project_block_mismatch_synapse_on_chromatin(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [synapse]
@@ -219,7 +219,7 @@ def test_simulation_block_rejected_for_cryoet(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [simulation]
@@ -228,7 +228,7 @@ def test_simulation_block_rejected_for_cryoet(tmp_path):
     )
     result = load_sample_record(tmp_path)
     assert result.record is None
-    assert any("cryoet" in e and "simulation" in e for e in result.sample_errors)
+    assert any("experimental" in e and "simulation" in e for e in result.sample_errors)
 
 
 def test_aunp_block_happy_path(tmp_path):
@@ -236,7 +236,7 @@ def test_aunp_block_happy_path(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [[aunp]]
@@ -268,7 +268,7 @@ def test_freezing_block_happy_path(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [freezing]
@@ -293,7 +293,7 @@ def test_milling_block_happy_path(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [milling]
@@ -448,7 +448,7 @@ def test_main_failure_returns_1(tmp_path, capsys):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         """,
     )
     rc = main([str(tmp_path)])
@@ -462,7 +462,7 @@ def test_main_prints_typo_warning(tmp_path, capsys):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         descriptiom = "typo"
         """,

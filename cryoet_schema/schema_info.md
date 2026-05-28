@@ -28,7 +28,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 | Field | Type | Source | Notes / researcher mapping |
 |---|---|---|---|
 | `sample_id` | text (PK) | `directory` | Sample folder name. |
-| `data_source` | enum | `sample.toml` (`[sample]`) | `cryoet` or `simulation`. |
+| `data_source` | enum | `sample.toml` (`[sample]`) | `experimental` or `simulation`. |
 | `project` | enum | `sample.toml` (`[sample]`) | `chromatin` or `synapse`. |
 | `type` | text | `sample.toml` (`[sample]`) | e.g. `cellular` / `reconstituted`. [researcher: Cellular vs Reconstituted branch] |
 | `cell_type` | text | `sample.toml` (`[sample]`) | Required when `type = cellular`. [researcher: Cell type] |
@@ -95,6 +95,12 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 |---|---|---|---|
 | `scheme` | text | `sample.toml` (`[milling]`) | [researcher: milling scheme] |
 | `date` | date | `sample.toml` (`[milling]`) | YYYY-MM-DD. [researcher: date] |
+
+### 1f. Simulation sub-entity (one row per sample when `data_source = simulation`)
+
+| Field | Type | Source | Notes / researcher mapping |
+|---|---|---|---|
+| `dataset_type` | text | `sample.toml` (`[simulation]`) | e.g. `single_molecule` / `slab` / `bulk`. |
 
 ---
 

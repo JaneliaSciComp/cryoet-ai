@@ -35,11 +35,11 @@
 
 # ════════════════════════════════════════════════════════════════
 # Sample conditions
-# These power the coverage matrix across cryoET and simulation data.
+# These power the coverage matrix across experimental cryoET and simulation-derived synthetic cryoET data.
 # ════════════════════════════════════════════════════════════════
 
 [sample]
-data_source = "<FILL IN>"     # enum: cryoet | simulation
+data_source = "<FILL IN>"     # enum: experimental | simulation
 project     = "<FILL IN>"     # enum: synapse | chromatin
 # type        = "<FILL IN>"   # text, e.g. tissue | cellular | reconstituted
 # cell_type   = "<FILL IN>"   # text, required if type = "cellular"

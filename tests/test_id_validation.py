@@ -115,17 +115,17 @@ def test_non_string_rejected():
 
 
 def test_sample_accepts_valid_sample_id():
-    s = Sample(sample_id="good_sample_01", data_source="cryoet", project="chromatin")
+    s = Sample(sample_id="good_sample_01", data_source="experimental", project="chromatin")
     assert s.sample_id == "good_sample_01"
 
 
 def test_sample_rejects_bad_sample_id():
     with pytest.raises(ValidationError):
-        Sample(sample_id="bad name", data_source="cryoet", project="chromatin")
+        Sample(sample_id="bad name", data_source="experimental", project="chromatin")
 
 
 def test_sample_allows_none_sample_id():
-    s = Sample(data_source="cryoet", project="chromatin")
+    s = Sample(data_source="experimental", project="chromatin")
     assert s.sample_id is None
 
 
@@ -154,7 +154,7 @@ def test_bad_sample_folder_name(tmp_path):
         bad / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -169,7 +169,7 @@ def test_bad_acquisition_folder_name(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -187,7 +187,7 @@ def test_acquisition_case_insensitive_collision(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -207,7 +207,7 @@ def test_tomogram_case_insensitive_collision(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -237,7 +237,7 @@ def test_annotation_case_insensitive_collision(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -269,7 +269,7 @@ def test_tomogram_and_annotation_sharing_id_is_allowed(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -297,7 +297,7 @@ def test_bad_tomogram_id_in_toml(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )

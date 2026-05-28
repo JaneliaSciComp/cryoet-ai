@@ -25,7 +25,7 @@ def test_unknown_key_on_sample(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         unknown_sample_key = "x"
         """,
@@ -43,7 +43,7 @@ def test_unknown_key_on_chromatin(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [chromatin]
@@ -63,7 +63,7 @@ def test_unknown_key_on_second_aunp_uses_positional_pk(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [[aunp]]
@@ -88,7 +88,7 @@ def test_unknown_key_on_tomogram_uses_id_not_index(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -122,7 +122,7 @@ def test_nested_unknown_dict_is_not_flattened(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
 
         [sample.unknown_block]

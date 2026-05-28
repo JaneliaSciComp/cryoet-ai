@@ -18,7 +18,7 @@ def _minimal_sample(root: Path) -> None:
         root / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         """,
     )
@@ -62,7 +62,7 @@ def test_bad_sample_toml_still_returns_record_none(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         """,
     )
     result = load_sample_record(tmp_path)
@@ -85,7 +85,7 @@ def test_fill_in_placeholder_in_sample_toml_warns_and_nones_field(tmp_path):
         tmp_path / "sample.toml",
         """
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         description = "<FILL IN>"
         """,

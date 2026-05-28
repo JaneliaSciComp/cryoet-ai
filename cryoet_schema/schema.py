@@ -113,7 +113,7 @@ class _Base(BaseModel):
 
 
 class DataSource(str, Enum):
-    cryoet = "cryoet"
+    experimental = "experimental"
     simulation = "simulation"
 
 
@@ -297,9 +297,9 @@ class SampleRecord(_Base):
             raise ValueError("sample.project is 'chromatin' but a [synapse] block is present")
         if self.sample.project == Project.synapse and self.chromatin is not None:
             raise ValueError("sample.project is 'synapse' but a [chromatin] block is present")
-        if self.sample.data_source == DataSource.cryoet and self.simulation is not None:
+        if self.sample.data_source == DataSource.experimental and self.simulation is not None:
             raise ValueError(
-                "sample.data_source is 'cryoet' but a [simulation] block is present"
+                "sample.data_source is 'experimental' but a [simulation] block is present"
             )
         return self
 
