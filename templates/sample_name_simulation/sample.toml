@@ -10,8 +10,8 @@
 # HOW TO USE
 # ──────────
 # 1. Replace every "<FILL IN>" placeholder with the appropriate value.
-# 2. Delete the [synapse] block if your project is "chromatin", or vice versa.
-# 3. Uncomment [[aunp]], [freezing], and [milling] blocks and fill in.
+# 2. Delete the [chromatin] block if your project is not "chromatin".
+# 3. Uncomment [[label]], [freezing], and [milling] blocks and fill in.
 #
 # EXTRA FIELDS
 # ────────────

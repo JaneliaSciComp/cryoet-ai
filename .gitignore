@@ -11,3 +11,6 @@ __pycache__
 
 # datasets
 data
+
+# Mac
+.DS_Store

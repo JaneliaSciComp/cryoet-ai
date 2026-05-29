@@ -58,9 +58,9 @@
 # These start empty — add them as processing happens.
 # ════════════════════════════════════════════════════════════════
 
-[tilt_series]
-software    = "<FILL IN>"   # text
-pixel_size  = "<FILL IN>"   # float, Angstrom
+# [tilt_series]
+# software    = "<FILL IN>"   # text
+# pixel_size  = "<FILL IN>"   # float, Angstrom
 
 # [raw_tomogram]
 # id            = "<FILL IN>"   # text, MUST equal the tomogram's folder name
