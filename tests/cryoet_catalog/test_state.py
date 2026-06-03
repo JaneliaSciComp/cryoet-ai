@@ -28,7 +28,7 @@ def session(tmp_path):
     s.add(
         orm.SampleORM(
             sample_id="sample_a",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
         )
     )
@@ -100,7 +100,7 @@ def test_load_soft_deleted_ids(session):
     session.add(
         orm.SampleORM(
             sample_id="sample_dead",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
             deleted_at=time.time(),
         )

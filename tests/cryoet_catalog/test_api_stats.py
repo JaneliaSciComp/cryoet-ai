@@ -43,18 +43,18 @@ def seeded_client(tmp_path):
         # ── chromatin: two live samples ────────────────────────────────
         # chrom_a: 2 acq × (2 tomos + 1 tilt_series + 1 annotation)
         s.add(orm.SampleORM(
-            sample_id="chrom_a", data_source=DataSource.cryoet,
+            sample_id="chrom_a", data_source=DataSource.experimental,
             project=Project.chromatin,
         ))
         for acq_id in ("acq1", "acq2"):
             s.add(orm.AcquisitionORM(
                 sample_id="chrom_a", acquisition_id=acq_id,
             ))
-            s.add(orm.TomogramORM(
+            s.add(orm.PostProcessedTomogramORM(
                 sample_id="chrom_a", acquisition_id=acq_id, tomogram_id="t1",
                 size_bytes=1000,
             ))
-            s.add(orm.TomogramORM(
+            s.add(orm.PostProcessedTomogramORM(
                 sample_id="chrom_a", acquisition_id=acq_id, tomogram_id="t2",
                 size_bytes=2000,
             ))
@@ -67,13 +67,13 @@ def seeded_client(tmp_path):
 
         # chrom_b: 1 acq × (1 tomo with NULL size_bytes + 0 tilt_series + 0 annotations)
         s.add(orm.SampleORM(
-            sample_id="chrom_b", data_source=DataSource.cryoet,
+            sample_id="chrom_b", data_source=DataSource.experimental,
             project=Project.chromatin,
         ))
         s.add(orm.AcquisitionORM(
             sample_id="chrom_b", acquisition_id="acq1",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="chrom_b", acquisition_id="acq1", tomogram_id="t1",
             size_bytes=None,  # must coalesce to 0 in by_project size_bytes
         ))
@@ -87,7 +87,7 @@ def seeded_client(tmp_path):
         s.add(orm.AcquisitionORM(
             sample_id="syn_a", acquisition_id="acq1",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="syn_a", acquisition_id="acq1", tomogram_id="t1",
             size_bytes=5000,
         ))
@@ -110,14 +110,14 @@ def seeded_client(tmp_path):
 
         # ── soft-deleted sample whose rows must NOT contribute ─────────
         s.add(orm.SampleORM(
-            sample_id="dead", data_source=DataSource.cryoet,
+            sample_id="dead", data_source=DataSource.experimental,
             project=Project.chromatin,
             deleted_at=time.time(),
         ))
         s.add(orm.AcquisitionORM(
             sample_id="dead", acquisition_id="acq1",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="dead", acquisition_id="acq1", tomogram_id="t1",
             size_bytes=99999,  # must NOT contribute to chromatin size_bytes
         ))
@@ -278,7 +278,7 @@ def test_no_completed_scan_returns_zero_warnings(tmp_path):
     s = Session()
     try:
         s.add(orm.SampleORM(
-            sample_id="x", data_source=DataSource.cryoet,
+            sample_id="x", data_source=DataSource.experimental,
             project=Project.chromatin,
         ))
         s.add(orm.ScansORM(

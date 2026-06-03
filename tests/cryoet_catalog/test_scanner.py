@@ -25,6 +25,19 @@ def _session(engine):
     return sessionmaker(bind=engine, future=True, expire_on_commit=False)()
 
 
+def _write_minimal_sample(parent: Path, sample_id: str) -> Path:
+    """Write the smallest legal sample.toml under ``parent / sample_id``.
+
+    Centralised so a schema rev to ``[sample]`` only touches one place.
+    """
+    d = parent / sample_id
+    d.mkdir()
+    (d / "sample.toml").write_text(
+        '[sample]\ndata_source = "experimental"\nproject = "chromatin"\n'
+    )
+    return d
+
+
 def test_scan_fixture_root_happy_path(engine):
     report = scanner.scan_root(engine, FIXTURES)
     assert report.upserted == 2  # sample_chromatin + sample_simulation
@@ -51,11 +64,12 @@ def test_scan_fixture_root_happy_path(engine):
         )
         assert {a.acquisition_id for a in acqs} == {"Position_86", "Position_87"}
 
-        # Tomogram with MRC-derived voxel spacing populated
+        # Raw tomogram row written (sample_chromatin fixture uses [raw_tomogram])
+        # with MRC + zarr-derived dimensions populated by the assembler.
         tomos = (
             s.execute(
-                select(orm.TomogramORM).where(
-                    orm.TomogramORM.sample_id == "sample_chromatin"
+                select(orm.RawTomogramORM).where(
+                    orm.RawTomogramORM.sample_id == "sample_chromatin"
                 )
             )
             .scalars()
@@ -63,8 +77,9 @@ def test_scan_fixture_root_happy_path(engine):
         )
         assert {t.tomogram_id for t in tomos} == {"bp_3dctf_bin4"}
         tomo = tomos[0]
-        assert tomo.voxel_spacing_angstrom == pytest.approx(11.7197, rel=1e-3)
-        assert tomo.voxel_spacing_angstrom_implied == pytest.approx(11.72, rel=1e-3)
+        assert tomo.image_size_x == 4
+        assert tomo.mrc_path is not None
+        assert tomo.zarr_path is not None
 
         # Annotation row populated with discovered files
         anns = (
@@ -153,16 +168,8 @@ def test_two_scans_make_two_scans_rows(engine):
 
 
 def test_prune_dry_run_reports_without_writing(engine, tmp_path):
-    sample_a = tmp_path / "sample_a"
-    sample_a.mkdir()
-    (sample_a / "sample.toml").write_text(
-        '[sample]\ndata_source = "cryoet"\nproject = "chromatin"\n'
-    )
-    sample_b = tmp_path / "sample_b"
-    sample_b.mkdir()
-    (sample_b / "sample.toml").write_text(
-        '[sample]\ndata_source = "cryoet"\nproject = "chromatin"\n'
-    )
+    _write_minimal_sample(tmp_path, "sample_a")
+    sample_b = _write_minimal_sample(tmp_path, "sample_b")
 
     scanner.scan_root(engine, tmp_path)
 
@@ -191,16 +198,8 @@ def test_prune_dry_run_reports_without_writing(engine, tmp_path):
 
 
 def test_prune_actually_soft_deletes(engine, tmp_path):
-    sample_a = tmp_path / "sample_a"
-    sample_a.mkdir()
-    (sample_a / "sample.toml").write_text(
-        '[sample]\ndata_source = "cryoet"\nproject = "chromatin"\n'
-    )
-    sample_b = tmp_path / "sample_b"
-    sample_b.mkdir()
-    (sample_b / "sample.toml").write_text(
-        '[sample]\ndata_source = "cryoet"\nproject = "chromatin"\n'
-    )
+    _write_minimal_sample(tmp_path, "sample_a")
+    sample_b = _write_minimal_sample(tmp_path, "sample_b")
 
     scanner.scan_root(engine, tmp_path)
 
@@ -223,11 +222,7 @@ def test_prune_actually_soft_deletes(engine, tmp_path):
 
 
 def test_resurrected_sample_reassembled_even_if_unchanged(engine, tmp_path):
-    sample_a = tmp_path / "sample_a"
-    sample_a.mkdir()
-    (sample_a / "sample.toml").write_text(
-        '[sample]\ndata_source = "cryoet"\nproject = "chromatin"\n'
-    )
+    _write_minimal_sample(tmp_path, "sample_a")
 
     # First scan
     scanner.scan_root(engine, tmp_path)
@@ -260,11 +255,7 @@ def test_resurrected_sample_reassembled_even_if_unchanged(engine, tmp_path):
 
 
 def test_failed_scan_marks_status_failed(engine, tmp_path):
-    sample_a = tmp_path / "sample_a"
-    sample_a.mkdir()
-    (sample_a / "sample.toml").write_text(
-        '[sample]\ndata_source = "cryoet"\nproject = "chromatin"\n'
-    )
+    sample_a = _write_minimal_sample(tmp_path, "sample_a")
 
     # First scan succeeds.
     scanner.scan_root(engine, tmp_path)

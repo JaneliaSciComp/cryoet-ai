@@ -89,11 +89,11 @@ def client(tmp_path, monkeypatch):
     s = Session()
     try:
         s.add(orm.SampleORM(
-            sample_id="sample_a", data_source=DataSource.cryoet, project=Project.chromatin,
+            sample_id="sample_a", data_source=DataSource.experimental, project=Project.chromatin,
         ))
         s.add(orm.AcquisitionORM(sample_id="sample_a", acquisition_id="acq1"))
         for tid in ("t1", "t2", "t3", "t4"):
-            s.add(orm.TomogramORM(
+            s.add(orm.PostProcessedTomogramORM(
                 sample_id="sample_a", acquisition_id="acq1", tomogram_id=tid,
                 mrc_path=str(mrc_path),
             ))

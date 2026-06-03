@@ -1,4 +1,4 @@
 [sample]
-data_source = "cryoet"
+data_source = "experimental"
 project = "chromatin"
 description = "fixture chromatin sample"

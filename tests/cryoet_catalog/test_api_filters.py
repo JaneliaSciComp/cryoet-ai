@@ -55,14 +55,14 @@ def client(tmp_path):
         s.add_all([
             orm.SampleORM(
                 sample_id="sample_alpha",
-                data_source=DataSource.cryoet,
+                data_source=DataSource.experimental,
                 project=Project.chromatin,
                 type="lamella",
                 description="alpha lamella with chromatin",
             ),
             orm.SampleORM(
                 sample_id="sample_beta",
-                data_source=DataSource.cryoet,
+                data_source=DataSource.experimental,
                 project=Project.chromatin,
                 type="cell",
                 description="beta whole cell",
@@ -76,14 +76,14 @@ def client(tmp_path):
             ),
             orm.SampleORM(
                 sample_id="sample_delta",
-                data_source=DataSource.cryoet,
+                data_source=DataSource.experimental,
                 project=Project.chromatin,
                 type="lamella",
                 description="empty sample",
             ),
             orm.SampleORM(
                 sample_id="sample_epsilon",
-                data_source=DataSource.cryoet,
+                data_source=DataSource.experimental,
                 project=Project.synapse,
                 type="cell",
                 description="epsilon cell with three tomograms",
@@ -112,35 +112,35 @@ def client(tmp_path):
 
         # tomograms
         s.add_all([
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_alpha", acquisition_id="acq1",
-                tomogram_id="t1", derived_from=[], voxel_spacing_angstrom=10.0,
+                tomogram_id="t1", derived_from=[], voxel_size=10.0,
             ),
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_beta", acquisition_id="acq1",
-                tomogram_id="t1", derived_from=[], voxel_spacing_angstrom=20.0,
+                tomogram_id="t1", derived_from=[], voxel_size=20.0,
             ),
             # gamma: two tomograms, both NULL voxel — exercises NULL-tolerance
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_gamma", acquisition_id="acq1",
-                tomogram_id="t1", derived_from=[], voxel_spacing_angstrom=None,
+                tomogram_id="t1", derived_from=[], voxel_size=None,
             ),
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_gamma", acquisition_id="acq1",
-                tomogram_id="t2", derived_from=[], voxel_spacing_angstrom=None,
+                tomogram_id="t2", derived_from=[], voxel_size=None,
             ),
             # epsilon: three tomograms, varying voxel spacings — count-independence
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_epsilon", acquisition_id="acq1",
-                tomogram_id="t1", derived_from=[], voxel_spacing_angstrom=5.0,
+                tomogram_id="t1", derived_from=[], voxel_size=5.0,
             ),
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_epsilon", acquisition_id="acq1",
-                tomogram_id="t2", derived_from=[], voxel_spacing_angstrom=15.0,
+                tomogram_id="t2", derived_from=[], voxel_size=15.0,
             ),
-            orm.TomogramORM(
+            orm.PostProcessedTomogramORM(
                 sample_id="sample_epsilon", acquisition_id="acq1",
-                tomogram_id="t3", derived_from=[], voxel_spacing_angstrom=25.0,
+                tomogram_id="t3", derived_from=[], voxel_size=25.0,
             ),
         ])
 
@@ -195,7 +195,7 @@ def test_filter_project_repeatable(client):
 def test_filter_data_source_repeatable(client):
     r = client.get(
         "/samples",
-        params=[("data_source", "cryoet"), ("data_source", "simulation")],
+        params=[("data_source", "experimental"), ("data_source", "simulation")],
     )
     assert _ids(r) == {
         "sample_alpha", "sample_beta", "sample_gamma", "sample_delta", "sample_epsilon",
@@ -299,14 +299,14 @@ def test_voxel_spacing_min_null_tolerance(client):
       sample_epsilon (15.0 + 25.0 — at least one matches)
     Excluded: sample_alpha (10.0 only), sample_delta (no tomograms).
     """
-    assert _ids(client.get("/samples", params={"voxel_spacing_min": 15.0})) == {
+    assert _ids(client.get("/samples", params={"voxel_size_min": 15.0})) == {
         "sample_beta", "sample_gamma", "sample_epsilon",
     }
 
 
 def test_voxel_spacing_max(client):
     """voxel_spacing_max=10.0 selects tomograms with vs<=10 OR vs IS NULL."""
-    assert _ids(client.get("/samples", params={"voxel_spacing_max": 10.0})) == {
+    assert _ids(client.get("/samples", params={"voxel_size_max": 10.0})) == {
         "sample_alpha", "sample_gamma", "sample_epsilon",
     }
 
@@ -396,7 +396,7 @@ def test_counts_are_filter_independent(client):
     # epsilon (has a t1@5.0 + t2@15.0 child) plus alpha + gamma. But the
     # n_tomograms count for epsilon must still be 3, not the count of
     # matching tomograms.
-    r = client.get("/samples", params={"voxel_spacing_max": 15.0})
+    r = client.get("/samples", params={"voxel_size_max": 15.0})
     by_id = {s["sample_id"]: s for s in r.json()}
     assert by_id["sample_epsilon"]["n_tomograms"] == 3
     assert by_id["sample_epsilon"]["n_acquisitions"] == 1

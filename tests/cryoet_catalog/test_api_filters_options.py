@@ -49,7 +49,7 @@ def seeded_client(tmp_path):
         # ── Live sample 1: chromatin / cryoet, type "cell" ──────────────
         s.add(orm.SampleORM(
             sample_id="live_a",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
             type="cell",
         ))
@@ -57,9 +57,9 @@ def seeded_client(tmp_path):
             sample_id="live_a", acquisition_id="acq1",
             microscope="Krios", pixel_size=1.5, voltage=300.0, camera="K3",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="live_a", acquisition_id="acq1", tomogram_id="t1",
-            voxel_spacing_angstrom=10.0,
+            voxel_size=10.0,
         ))
         s.add(orm.TiltSeriesORM(
             sample_id="live_a", acquisition_id="acq1", tilt_series_id="ts1",
@@ -78,9 +78,9 @@ def seeded_client(tmp_path):
             microscope="Arctica", pixel_size=2.5, voltage=200.0,
             camera="Falcon4",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="live_b", acquisition_id="acq1", tomogram_id="t1",
-            voxel_spacing_angstrom=15.0,
+            voxel_size=15.0,
         ))
         s.add(orm.TiltSeriesORM(
             sample_id="live_b", acquisition_id="acq1", tilt_series_id="ts1",
@@ -91,7 +91,7 @@ def seeded_client(tmp_path):
         # but its tomogram has a wider voxel_spacing so the range stretches.
         s.add(orm.SampleORM(
             sample_id="live_c",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
             type="cell",  # duplicate of live_a
         ))
@@ -102,9 +102,9 @@ def seeded_client(tmp_path):
             voltage=300.0,       # duplicate
             camera="K3",         # duplicate
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="live_c", acquisition_id="acq1", tomogram_id="t1",
-            voxel_spacing_angstrom=5.0,  # new range minimum
+            voxel_size=5.0,  # new range minimum
         ))
         s.add(orm.TiltSeriesORM(
             sample_id="live_c", acquisition_id="acq1", tilt_series_id="ts1",
@@ -118,7 +118,7 @@ def seeded_client(tmp_path):
         # n_tilts=1 (min) and 9999 (max), pixel_size=0.1 (min) and 99.9 (max)).
         s.add(orm.SampleORM(
             sample_id="dead",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.synapse,
             type="deleted_type",
             deleted_at=time.time(),
@@ -131,13 +131,13 @@ def seeded_client(tmp_path):
             sample_id="dead", acquisition_id="acq2",
             microscope="Talos", pixel_size=99.9, voltage=120.0, camera="GIF",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="dead", acquisition_id="acq1", tomogram_id="t1",
-            voxel_spacing_angstrom=99.0,
+            voxel_size=99.0,
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="dead", acquisition_id="acq2", tomogram_id="t1",
-            voxel_spacing_angstrom=999.0,
+            voxel_size=999.0,
         ))
         s.add(orm.TiltSeriesORM(
             sample_id="dead", acquisition_id="acq1", tilt_series_id="ts1",
@@ -172,7 +172,7 @@ def test_lists_are_sorted_unique_and_exclude_soft_deleted(seeded_client):
 
     # All distinct, sorted ascending — soft-deleted contributions absent.
     assert body["projects"] == ["chromatin", "synapse"]
-    assert body["data_sources"] == ["cryoet", "simulation"]
+    assert body["data_sources"] == ["experimental", "simulation"]
     assert body["types"] == ["cell", "tissue"]
     # Soft-deleted "Talos" must NOT appear.
     assert body["microscopes"] == ["Arctica", "Krios"]
@@ -202,8 +202,8 @@ def test_range_bounds_reflect_live_data(seeded_client):
     assert body["pixel_size"]["max"] == 2.5
 
     # voxel_spacing across live tomograms: {5.0, 10.0, 15.0}
-    assert body["voxel_spacing"]["min"] == 5.0
-    assert body["voxel_spacing"]["max"] == 15.0
+    assert body["voxel_size"]["min"] == 5.0
+    assert body["voxel_size"]["max"] == 15.0
 
     # n_tilts across live tilt_series: {40, 60, 120}
     assert body["n_tilts"]["min"] == 40
@@ -217,8 +217,8 @@ def test_soft_deleted_does_not_widen_ranges(seeded_client):
     body = r.json()
     assert body["pixel_size"]["min"] != 0.1
     assert body["pixel_size"]["max"] != 99.9
-    assert body["voxel_spacing"]["min"] != 99.0
-    assert body["voxel_spacing"]["max"] != 999.0
+    assert body["voxel_size"]["min"] != 99.0
+    assert body["voxel_size"]["max"] != 999.0
     assert body["n_tilts"]["min"] != 1
     assert body["n_tilts"]["max"] != 9999
 
@@ -235,7 +235,7 @@ def test_empty_database_returns_empty_lists_and_null_ranges(empty_client):
         "microscopes", "voltages", "cameras", "image_formats",
     ):
         assert body[key] == [], f"{key} should be empty"
-    for key in ("pixel_size", "voxel_spacing", "n_tilts"):
+    for key in ("pixel_size", "voxel_size", "n_tilts"):
         assert body[key]["min"] is None
         assert body[key]["max"] is None
 
@@ -247,16 +247,16 @@ def test_empty_tilt_series_facet_only(tmp_path):
     s = Session()
     try:
         s.add(orm.SampleORM(
-            sample_id="x", data_source=DataSource.cryoet,
+            sample_id="x", data_source=DataSource.experimental,
             project=Project.chromatin, type="cell",
         ))
         s.add(orm.AcquisitionORM(
             sample_id="x", acquisition_id="acq1",
             microscope="Krios", pixel_size=1.0, voltage=300.0, camera="K3",
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="x", acquisition_id="acq1", tomogram_id="t1",
-            voxel_spacing_angstrom=5.0,
+            voxel_size=5.0,
         ))
         s.commit()
     finally:
@@ -269,4 +269,4 @@ def test_empty_tilt_series_facet_only(tmp_path):
     assert body["n_tilts"]["max"] is None
     # Sanity: the other facets are not empty.
     assert body["microscopes"] == ["Krios"]
-    assert body["voxel_spacing"]["min"] == 5.0
+    assert body["voxel_size"]["min"] == 5.0

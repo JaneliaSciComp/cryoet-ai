@@ -38,12 +38,11 @@ def _seed(session, ids: list[str]) -> None:
             SampleRecord(
                 sample=Sample(
                     sample_id=sid,
-                    data_source=DataSource.cryoet,
+                    data_source=DataSource.experimental,
                     project=Project.chromatin,
                 )
             ),
             extras=[],
-            tomogram_aux={},
             warnings=[],
             scan_run_id="seed",
         )

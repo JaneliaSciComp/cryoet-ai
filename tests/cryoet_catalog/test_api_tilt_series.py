@@ -95,7 +95,7 @@ def client(tmp_path):
     s = Session()
     try:
         s.add(orm.SampleORM(
-            sample_id="sample_a", data_source=DataSource.cryoet, project=Project.chromatin,
+            sample_id="sample_a", data_source=DataSource.experimental, project=Project.chromatin,
         ))
         s.add(orm.AcquisitionORM(sample_id="sample_a", acquisition_id="acq1"))
         s.add(orm.TiltSeriesORM(
@@ -122,7 +122,7 @@ def client(tmp_path):
         ))
         # Soft-deleted parent
         s.add(orm.SampleORM(
-            sample_id="sample_dead", data_source=DataSource.cryoet, project=Project.chromatin,
+            sample_id="sample_dead", data_source=DataSource.experimental, project=Project.chromatin,
             deleted_at=time.time(),
         ))
         s.add(orm.AcquisitionORM(sample_id="sample_dead", acquisition_id="acq1"))

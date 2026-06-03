@@ -27,7 +27,7 @@ def _write_minimal_sample_toml(sample_dir: Path) -> None:
     (sample_dir / "sample.toml").write_text(
         """\
 [sample]
-data_source = "cryoet"
+data_source = "experimental"
 project = "synapse"
 """
     )
@@ -41,7 +41,7 @@ def test_toml_files_delegates(tmp_path: Path) -> None:
 
     assert isinstance(result, LoadResult)
     assert result.record is not None
-    assert result.record.sample.data_source.value == "cryoet"
+    assert result.record.sample.data_source.value == "experimental"
     assert result.record.sample.project.value == "synapse"
     # sample_id is injected from the directory name.
     assert result.record.sample.sample_id == "my_sample"

@@ -11,9 +11,7 @@ import pytest
 
 from cryoet_catalog.assembler import (
     AssemblyResult,
-    FieldConflict,
     ScanWarning,
-    _relative_close,
     assemble_sample,
 )
 from cryoet_catalog.discovery import SampleLocation, iter_samples
@@ -27,6 +25,26 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def _write(p: Path, content: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(dedent(content).lstrip())
+
+
+def _write_minimal_sample_toml(sample_dir: Path, extra: str = "") -> Path:
+    """Write the smallest legal sample.toml under ``sample_dir``.
+
+    ``extra`` is appended verbatim inside the ``[sample]`` block for tests
+    that need an additional field (e.g. ``description = "<FILL IN>"`` or
+    a deliberate typo). Centralised so a schema rev to ``[sample]`` only
+    touches one place.
+    """
+    path = sample_dir / "sample.toml"
+    body = """
+        [sample]
+        data_source = "experimental"
+        project = "chromatin"
+        """
+    if extra:
+        body = body + "        " + extra.strip() + "\n"
+    _write(path, body)
+    return path
 
 
 def _make_mrc(p: Path, shape=(4, 4, 4), voxel_size_x: float = 11.7197) -> None:
@@ -86,31 +104,15 @@ def test_happy_path_chromatin_fixture():
     assert p86.pixel_size == 2.93
     assert p86.voltage == 300.0
 
-    # Tomogram populated from MRC + zarr parsers
-    tomos = {t.tomogram_id: t for t in acqs["Position_86"].tomogram}
-    assert "bp_3dctf_bin4" in tomos
-    tomo = tomos["bp_3dctf_bin4"]
-    assert tomo.image_size_x is not None
-    assert tomo.image_size_x == 4
-    assert tomo.mrc_path is not None
-    assert tomo.zarr_path is not None
-    assert tomo.zarr_axes == "zyx"
-    assert tomo.zarr_scale == [11.72, 11.72, 11.72]
-    assert tomo.is_raw is True  # derived_from == []
-
-    aux_key = ("sample_chromatin", "Position_86", "bp_3dctf_bin4")
-    assert aux_key in result.tomogram_aux
-    aux = result.tomogram_aux[aux_key]
-    assert aux["voxel_spacing_angstrom"] == pytest.approx(11.7197, rel=1e-4)
-    assert aux["voxel_spacing_angstrom_implied"] == pytest.approx(2.93 * 4)
-
-    # implied vs MRC are within 1e-3 relative — no mismatch warning
-    assert not any(
-        w.category == "voxel_spacing_implied_mismatch" for w in result.warnings
-    )
-    assert not any(
-        c.category == "voxel_spacing_implied_mismatch" for c in result.conflicts
-    )
+    # Raw tomogram populated from MRC + zarr parsers
+    raw = acqs["Position_86"].raw_tomogram
+    assert raw is not None
+    assert raw.tomogram_id == "bp_3dctf_bin4"
+    assert raw.image_size_x == 4
+    assert raw.mrc_path is not None
+    assert raw.zarr_path is not None
+    assert raw.zarr_axes == "zyx"
+    assert raw.zarr_scale == [11.72, 11.72, 11.72]
 
     # Annotation files populated
     anns = {a.annotation_id: a for a in acqs["Position_86"].annotation}
@@ -122,11 +124,9 @@ def test_happy_path_chromatin_fixture():
     assert files == sorted(files)
 
 
-def _build_basic_cryoet_sample(
+def _build_basic_experimental_sample(
     sample_dir: Path,
     *,
-    voxel_bin: int,
-    mrc_voxel: float,
     pixel_size: float = 2.93,
     voltage: float = 300.0,
     extra_sample_block: str = "",
@@ -135,7 +135,7 @@ def _build_basic_cryoet_sample(
         sample_dir / "sample.toml",
         f"""
         [sample]
-        data_source = "cryoet"
+        data_source = "experimental"
         project = "chromatin"
         description = "test"
         {extra_sample_block}
@@ -143,13 +143,12 @@ def _build_basic_cryoet_sample(
     )
     _write(
         sample_dir / "Pos1" / "acquisition.toml",
-        f"""
+        """
         [acquisition]
         microscope = "Krios"
 
-        [[tomogram]]
+        [raw_tomogram]
         id = "tomo1"
-        voxel_bin = {voxel_bin}
         """,
     )
     _write(
@@ -166,138 +165,14 @@ def _build_basic_cryoet_sample(
     # representative frame
     (sample_dir / "Pos1" / "Frames" / "001.eer").write_bytes(b"")
     tomo_dir = sample_dir / "Pos1" / "Reconstructions" / "Tomograms" / "tomo1"
-    _make_mrc(tomo_dir / "recon.mrc", voxel_size_x=mrc_voxel)
-    _make_zattrs(tomo_dir / "recon.ome.zarr", scale=(mrc_voxel, mrc_voxel, mrc_voxel))
+    _make_mrc(tomo_dir / "recon.mrc")
+    _make_zattrs(tomo_dir / "recon.ome.zarr")
     return _sample_loc(sample_dir)
-
-
-def test_voxel_mismatch_fixture_relative_tolerance(tmp_path):
-    """pixel_size=2.93, voxel_bin=16, MRC voxel=46.8788 — within relative tolerance."""
-    sample_dir = tmp_path / "sample_test"
-    loc = _build_basic_cryoet_sample(
-        sample_dir, voxel_bin=16, mrc_voxel=46.8788
-    )
-    result = assemble_sample(loc)
-
-    assert result.errors == []
-    # implied = 46.88, MRC = 46.8788 — relative diff ~2.6e-5 < 1e-3
-    assert _relative_close(46.88, 46.8788)
-    assert not any(
-        w.category == "voxel_spacing_implied_mismatch" for w in result.warnings
-    )
-    assert not any(
-        c.category == "voxel_spacing_implied_mismatch" for c in result.conflicts
-    )
-
-
-def test_voxel_mismatch_actually_mismatches(tmp_path):
-    sample_dir = tmp_path / "sample_test"
-    loc = _build_basic_cryoet_sample(sample_dir, voxel_bin=4, mrc_voxel=50.0)
-    result = assemble_sample(loc)
-
-    # implied = 11.72, MRC = 50.0 — clearly outside tolerance
-    mismatches = [
-        c
-        for c in result.conflicts
-        if c.category == "voxel_spacing_implied_mismatch"
-    ]
-    assert len(mismatches) == 1
-    conflict = mismatches[0]
-    assert conflict.severity == "warning"
-    assert conflict.values["mrc_header"] == pytest.approx(50.0)
-    assert conflict.values["implied (pixel_size*voxel_bin)"] == pytest.approx(
-        11.72
-    )
-
-    warnings = [
-        w
-        for w in result.warnings
-        if w.category == "voxel_spacing_implied_mismatch"
-    ]
-    assert len(warnings) == 1
-    assert "tomogram[tomo1]" in warnings[0].location
-    # warn-mode: errors stays empty
-    assert result.errors == []
-
-
-def test_voxel_mismatch_on_error_raises_to_errors(tmp_path):
-    sample_dir = tmp_path / "sample_test"
-    loc = _build_basic_cryoet_sample(sample_dir, voxel_bin=4, mrc_voxel=50.0)
-    result = assemble_sample(loc, on_voxel_mismatch="error")
-
-    # Error mode promotes the mismatch to result.errors and conflict.severity.
-    assert len(result.errors) >= 1
-    assert any("voxel_spacing_angstrom" in e for e in result.errors)
-    mismatches = [
-        c
-        for c in result.conflicts
-        if c.category == "voxel_spacing_implied_mismatch"
-    ]
-    assert len(mismatches) == 1
-    assert mismatches[0].severity == "error"
-    # No warning emitted in error mode
-    assert not any(
-        w.category == "voxel_spacing_implied_mismatch" for w in result.warnings
-    )
-
-
-def test_simulation_skips_voxel_check(tmp_path):
-    """Simulation samples have no MDOC pixel_size, so no implied value, so no check."""
-    sample_dir = tmp_path / "sample_sim"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "simulation"
-        project = "chromatin"
-
-        [simulation]
-        dataset_type = "test"
-        """,
-    )
-    _write(
-        sample_dir / "Pos1" / "acquisition.toml",
-        """
-        [acquisition]
-        microscope = "Krios"
-
-        [[tomogram]]
-        id = "tomo1"
-        voxel_bin = 4
-        """,
-    )
-    # Note: NO Frames/ dir — no mdoc, so no pixel_size populated.
-    tomo_dir = sample_dir / "Pos1" / "SyntheticCryoET" / "tomo1"
-    _make_mrc(tomo_dir / "recon.mrc", voxel_size_x=999.0)  # wildly wrong
-
-    loc = _sample_loc(sample_dir)
-    result = assemble_sample(loc)
-
-    assert result.errors == []
-    # No mismatch — implied couldn't be computed.
-    assert not any(
-        w.category == "voxel_spacing_implied_mismatch" for w in result.warnings
-    )
-    assert not any(
-        c.category == "voxel_spacing_implied_mismatch" for c in result.conflicts
-    )
-    aux_key = ("sample_sim", "Pos1", "tomo1")
-    assert result.tomogram_aux[aux_key]["voxel_spacing_angstrom_implied"] is None
-    assert result.tomogram_aux[aux_key]["voxel_spacing_angstrom"] == pytest.approx(
-        999.0
-    )
 
 
 def test_unparseable_mdoc_emits_warning(tmp_path):
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
     _write(
         sample_dir / "Pos1" / "acquisition.toml",
         """
@@ -335,14 +210,7 @@ def test_unparseable_mdoc_emits_warning(tmp_path):
 
 def test_synthesized_frames_only_acquisition(tmp_path):
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
     # No acquisition.toml under Pos1 — Frames-only
     _write(
         sample_dir / "Pos1" / "Frames" / "001.mdoc",
@@ -378,14 +246,7 @@ def test_synthesized_frames_only_acquisition(tmp_path):
 def test_unparseable_acquisition_toml_isolated(tmp_path):
     """Bad acquisition.toml -> isolated; good one validates fully."""
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
     # Good acquisition
     _write(
         sample_dir / "Good" / "acquisition.toml",
@@ -393,9 +254,8 @@ def test_unparseable_acquisition_toml_isolated(tmp_path):
         [acquisition]
         microscope = "Krios"
 
-        [[tomogram]]
+        [raw_tomogram]
         id = "tomo_good"
-        voxel_bin = 4
         """,
     )
     (sample_dir / "Good" / "Reconstructions" / "Tomograms" / "tomo_good").mkdir(parents=True)
@@ -429,24 +289,19 @@ def test_unparseable_acquisition_toml_isolated(tmp_path):
     acqs = result.record.acquisitions
     assert "Good" in acqs
     assert "Bad" in acqs
-    # Good is fully validated and contains its tomogram declaration
-    assert [t.tomogram_id for t in acqs["Good"].tomogram] == ["tomo_good"]
+    # Good is fully validated and contains its raw tomogram declaration.
+    good_raw = acqs["Good"].raw_tomogram
+    assert good_raw is not None and good_raw.tomogram_id == "tomo_good"
+    assert acqs["Good"].post_processed_tomogram == []
     # Bad is a synthesized placeholder (empty)
-    assert acqs["Bad"].tomogram == []
+    assert acqs["Bad"].raw_tomogram is None
+    assert acqs["Bad"].post_processed_tomogram == []
     assert acqs["Bad"].annotation == []
 
 
 def test_typo_warning_categorized(tmp_path):
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        descriptiom = "x"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir, extra='descriptiom = "x"')
     loc = _sample_loc(sample_dir)
     # The underlying Pydantic typo-detector emits a UserWarning; the assembler
     # then re-emits it as a categorized ScanWarning. We assert the UserWarning
@@ -462,15 +317,7 @@ def test_typo_warning_categorized(tmp_path):
 
 def test_unfilled_placeholder_warning_categorized(tmp_path):
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        description = "<FILL IN>"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir, extra='description = "<FILL IN>"')
     loc = _sample_loc(sample_dir)
     result = assemble_sample(loc)
 
@@ -484,16 +331,9 @@ def test_unfilled_placeholder_warning_categorized(tmp_path):
 
 
 def test_undeclared_tomogram_folder_warns(tmp_path):
-    """Folder under Reconstructions/Tomograms with no [[tomogram]] block warns."""
+    """Folder under Reconstructions/Tomograms with no tomogram block warns."""
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
     _write(
         sample_dir / "acq1" / "acquisition.toml",
         """
@@ -519,14 +359,7 @@ def test_undeclared_tomogram_folder_warns(tmp_path):
 
 def test_undeclared_annotation_folder_warns(tmp_path):
     sample_dir = tmp_path / "sample_test"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
     _write(
         sample_dir / "acq1" / "acquisition.toml",
         """

@@ -3,7 +3,17 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
-from cryoet_schema import SampleRecord, Sample, Chromatin, Aunp, Acquisition, Tomogram, Annotation, AcquisitionFile
+from cryoet_schema import (
+    Acquisition,
+    AcquisitionFile,
+    Annotation,
+    Chromatin,
+    Fiducial,
+    Label,
+    PostProcessedTomogram,
+    Sample,
+    SampleRecord,
+)
 from cryoet_schema.schema import DataSource, Project
 from cryoet_schema.loader import ExtrasEntry
 from cryoet_catalog import db, orm
@@ -37,33 +47,81 @@ def client(tmp_path):
     s = Session()
     try:
         # sample_a — full with everything
-        tomo = Tomogram(id="t1", voxel_bin=4)
+        tomo = PostProcessedTomogram(id="t1", voxel_size=11.72)
         ann = Annotation(id="a1", target_tomogram="t1", files=["x.mrc"])
-        acq = AcquisitionFile(acquisition=Acquisition(acquisition_id="acq1"), tomogram=[tomo], annotation=[ann])
+        acq = AcquisitionFile(
+            acquisition=Acquisition(acquisition_id="acq1"),
+            post_processed_tomogram=[tomo],
+            annotation=[ann],
+        )
         rec_a = SampleRecord(
-            sample=Sample(sample_id="sample_a", data_source=DataSource.cryoet, project=Project.chromatin, description="A"),
+            sample=Sample(
+                sample_id="sample_a",
+                data_source=DataSource.experimental,
+                project=Project.chromatin,
+                description="A",
+            ),
             chromatin=Chromatin(buffer="HEPES"),
-            aunp=[Aunp(size_nm=5.0)],
+            fiducial=Fiducial(vendor="Aurion", aunp_size_nm=10.0),
+            label=[Label(label_target="actin", aunp_size_nm=5.0)],
             acquisitions={"acq1": acq},
         )
-        upsert_sample_record(s, rec_a, extras=[
-            ExtrasEntry(entity_type="sample", entity_pk=("sample_a",), key="weird", value="value"),
-            ExtrasEntry(entity_type="chromatin", entity_pk=("sample_a",), key="weird", value=1),
-        ], tomogram_aux={
-            ("sample_a", "acq1", "t1"): {"voxel_spacing_angstrom": 11.72, "voxel_spacing_angstrom_implied": 11.72},
-        }, warnings=[
-            ScanWarning(category="extra_field", location="sample", message="extra field 'weird'"),
-        ], scan_run_id="run-A")
+        upsert_sample_record(
+            s,
+            rec_a,
+            extras=[
+                ExtrasEntry(
+                    entity_type="sample",
+                    entity_pk=("sample_a",),
+                    key="weird",
+                    value="value",
+                ),
+                ExtrasEntry(
+                    entity_type="chromatin",
+                    entity_pk=("sample_a",),
+                    key="weird",
+                    value=1,
+                ),
+            ],
+            warnings=[
+                ScanWarning(
+                    category="extra_field",
+                    location="sample",
+                    message="extra field 'weird'",
+                ),
+            ],
+            scan_run_id="run-A",
+        )
 
         # sample_b — minimal
-        rec_b = SampleRecord(sample=Sample(sample_id="sample_b", data_source=DataSource.simulation, project=Project.synapse))
-        upsert_sample_record(s, rec_b, extras=[], tomogram_aux={}, warnings=[], scan_run_id="run-A")
+        rec_b = SampleRecord(
+            sample=Sample(
+                sample_id="sample_b",
+                data_source=DataSource.simulation,
+                project=Project.synapse,
+            )
+        )
+        upsert_sample_record(
+            s, rec_b, extras=[], warnings=[], scan_run_id="run-A"
+        )
 
         # sample_c — soft-deleted (filter test)
-        rec_c = SampleRecord(sample=Sample(sample_id="sample_c", data_source=DataSource.cryoet, project=Project.chromatin))
-        upsert_sample_record(s, rec_c, extras=[], tomogram_aux={}, warnings=[], scan_run_id="run-A")
+        rec_c = SampleRecord(
+            sample=Sample(
+                sample_id="sample_c",
+                data_source=DataSource.experimental,
+                project=Project.chromatin,
+            )
+        )
+        upsert_sample_record(
+            s, rec_c, extras=[], warnings=[], scan_run_id="run-A"
+        )
         from sqlalchemy import update as sa_update
-        s.execute(sa_update(orm.SampleORM).where(orm.SampleORM.sample_id == "sample_c").values(deleted_at=time.time()))
+        s.execute(
+            sa_update(orm.SampleORM)
+            .where(orm.SampleORM.sample_id == "sample_c")
+            .values(deleted_at=time.time())
+        )
 
         # scans rows
         s.add(orm.ScansORM(
@@ -123,7 +181,7 @@ def test_list_samples_includes_warning_count(client):
 
 
 def test_list_samples_includes_child_counts(client):
-    """sample_a is seeded with 1 acquisition, 1 tomogram, 0 tilt_series."""
+    """sample_a is seeded with 1 acquisition, 1 (post-processed) tomogram, 0 tilt_series."""
     r = client.get("/samples")
     by_id = {s["sample_id"]: s for s in r.json()}
     assert by_id["sample_a"]["n_acquisitions"] == 1
@@ -150,11 +208,16 @@ def test_get_sample_detail(client):
     assert body["sample_id"] == "sample_a"
     assert body["chromatin"] is not None
     assert body["chromatin"]["buffer"] == "HEPES"
-    assert body["aunp"][0]["size_nm"] == 5.0
+    assert body["fiducial"] is not None
+    assert body["fiducial"]["vendor"] == "Aurion"
+    assert body["label"][0]["label_target"] == "actin"
+    assert body["label"][0]["aunp_size_nm"] == 5.0
     assert len(body["acquisitions"]) == 1
     acq = body["acquisitions"][0]
     assert acq["acquisition_id"] == "acq1"
-    assert acq["tomograms"][0]["voxel_spacing_angstrom"] == pytest.approx(11.72)
+    assert acq["raw_tomogram"] is None
+    assert len(acq["post_processed_tomograms"]) == 1
+    assert acq["post_processed_tomograms"][0]["voxel_size"] == pytest.approx(11.72)
 
 
 def test_get_sample_404(client):

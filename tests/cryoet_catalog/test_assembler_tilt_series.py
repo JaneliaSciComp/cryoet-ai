@@ -16,6 +16,42 @@ def _write(p: Path, content: str) -> None:
     p.write_text(dedent(content).lstrip())
 
 
+def _write_minimal_sample_toml(sample_dir: Path) -> Path:
+    """Write the smallest legal sample.toml under ``sample_dir``.
+
+    Centralised so a schema rev to ``[sample]`` only touches one place.
+    """
+    path = sample_dir / "sample.toml"
+    _write(
+        path,
+        """
+        [sample]
+        data_source = "experimental"
+        project = "chromatin"
+        """,
+    )
+    return path
+
+
+def _write_minimal_acquisition_toml(
+    sample_dir: Path, acq_id: str = "Pos1", extra: str = ""
+) -> Path:
+    """Write the smallest legal acquisition.toml under ``sample_dir / acq_id``.
+
+    ``extra`` is appended verbatim (after dedent/lstrip) for tests that need
+    additional TOML blocks (e.g. ``[[post_processed_tomogram]]``).
+    """
+    path = sample_dir / acq_id / "acquisition.toml"
+    body = """
+        [acquisition]
+        microscope = "Krios"
+        """
+    if extra:
+        body = body + extra
+    _write(path, body)
+    return path
+
+
 def _sample_loc(sample_dir: Path) -> SampleLocation:
     return SampleLocation(
         path=sample_dir,
@@ -41,21 +77,8 @@ ExposureDose = 0.5
 
 def test_assembler_merges_tilt_series_into_acquisition(tmp_path: Path) -> None:
     sample_dir = tmp_path / "sample_a"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
-    _write(
-        sample_dir / "Pos1" / "acquisition.toml",
-        """
-        [acquisition]
-        microscope = "Krios"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
+    _write_minimal_acquisition_toml(sample_dir)
     _write(sample_dir / "Pos1" / "Frames" / "ts.mdoc", _MDOC)
     # Sibling tilt-image file so image_format gets detected.
     (sample_dir / "Pos1" / "Frames" / "001.eer").write_bytes(b"")
@@ -87,14 +110,7 @@ def test_assembler_records_acquisition_path_for_synthesized(
 ) -> None:
     """Synthesized acquisitions (no acquisition.toml) still get ``acq.path``."""
     sample_dir = tmp_path / "sample_b"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
     # No acquisition.toml; presence of Frames/ alone triggers discovery.
     (sample_dir / "Pos1" / "Frames").mkdir(parents=True)
     _write(sample_dir / "Pos1" / "Frames" / "ts.mdoc", _MDOC)
@@ -111,21 +127,11 @@ def test_assembler_records_tomogram_size_bytes(tmp_path: Path) -> None:
     np = pytest.importorskip("numpy")
 
     sample_dir = tmp_path / "sample_c"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
-    _write(
-        sample_dir / "Pos1" / "acquisition.toml",
-        """
-        [acquisition]
-        microscope = "Krios"
-
-        [[tomogram]]
+    _write_minimal_sample_toml(sample_dir)
+    _write_minimal_acquisition_toml(
+        sample_dir,
+        extra="""
+        [[post_processed_tomogram]]
         id = "tomo_a"
         """,
     )
@@ -139,7 +145,7 @@ def test_assembler_records_tomogram_size_bytes(tmp_path: Path) -> None:
 
     result = assemble_sample(_sample_loc(sample_dir))
     assert result.record is not None
-    tomo = result.record.acquisitions["Pos1"].tomogram[0]
+    tomo = result.record.acquisitions["Pos1"].post_processed_tomogram[0]
     assert tomo.size_bytes is not None
     assert tomo.size_bytes == mrc_path.stat().st_size
 
@@ -158,21 +164,8 @@ def test_per_tilt_layout_produces_one_row(tmp_path: Path) -> None:
     Now the parser collapses the group by common prefix.
     """
     sample_dir = tmp_path / "sample_gouaux"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
-    _write(
-        sample_dir / "Pos1" / "acquisition.toml",
-        """
-        [acquisition]
-        microscope = "Krios"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
+    _write_minimal_acquisition_toml(sample_dir)
     frames_dir = sample_dir / "Pos1" / "Frames"
     frames_dir.mkdir(parents=True)
     for idx, angle in enumerate(["-30.0", "0.0", "30.0"], start=1):
@@ -206,21 +199,8 @@ def test_assembler_emits_layout_unknown_warning(tmp_path: Path) -> None:
     pattern triggers a ``tilt_series_layout_unknown`` warning.
     """
     sample_dir = tmp_path / "sample_unknown"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
-    _write(
-        sample_dir / "Pos1" / "acquisition.toml",
-        """
-        [acquisition]
-        microscope = "Krios"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
+    _write_minimal_acquisition_toml(sample_dir)
     frames_dir = sample_dir / "Pos1" / "Frames"
     frames_dir.mkdir(parents=True)
     (frames_dir / "weird_name.mdoc").write_text(_PER_TILT_HEADER)
@@ -256,21 +236,8 @@ def test_assembler_emits_tilt_series_collision_warning(tmp_path: Path) -> None:
     import cryoet_catalog.assembler as assembler
 
     sample_dir = tmp_path / "sample_d"
-    _write(
-        sample_dir / "sample.toml",
-        """
-        [sample]
-        data_source = "cryoet"
-        project = "chromatin"
-        """,
-    )
-    _write(
-        sample_dir / "Pos1" / "acquisition.toml",
-        """
-        [acquisition]
-        microscope = "Krios"
-        """,
-    )
+    _write_minimal_sample_toml(sample_dir)
+    _write_minimal_acquisition_toml(sample_dir)
     _write(sample_dir / "Pos1" / "Frames" / "ts.mdoc", _MDOC)
 
     fake_result = TiltSeriesParseResult(

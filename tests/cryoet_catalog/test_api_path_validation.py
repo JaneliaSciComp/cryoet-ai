@@ -82,19 +82,19 @@ def client(tmp_path):
     s = Session()
     try:
         s.add(orm.SampleORM(
-            sample_id="sample_a", data_source=DataSource.cryoet, project=Project.chromatin,
+            sample_id="sample_a", data_source=DataSource.experimental, project=Project.chromatin,
         ))
         s.add(orm.AcquisitionORM(sample_id="sample_a", acquisition_id="acq1"))
         # Legit row — used to confirm a positive case works in same fixture
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_a", acquisition_id="acq1", tomogram_id="ok",
             mrc_path=str(inside_mrc),
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_a", acquisition_id="acq1", tomogram_id="outside",
             mrc_path=str(outside_mrc),
         ))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_a", acquisition_id="acq1", tomogram_id="symlink",
             mrc_path=str(symlink_inside),
         ))

@@ -65,14 +65,12 @@ def _build_record_with_tilt_series_extras() -> SampleRecord:
     return SampleRecord(
         sample=Sample(
             sample_id="s1",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
         ),
         acquisitions={
             "Pos1": AcquisitionFile(
                 acquisition=Acquisition(acquisition_id="Pos1"),
-                tomogram=[],
-                annotation=[],
                 tilt_series=[ts],
             )
         },
@@ -107,7 +105,6 @@ def test_upsert_persists_tilt_series_extras(session) -> None:
         session,
         record,
         extras=extras,
-        tomogram_aux={},
         warnings=[],
         scan_run_id="run-1",
     )
@@ -137,7 +134,7 @@ def test_load_sample_record_emits_tilt_series_extras(tmp_path: Path) -> None:
         textwrap.dedent(
             """\
             [sample]
-            data_source = "cryoet"
+            data_source = "experimental"
             project = "chromatin"
             """
         )

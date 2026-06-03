@@ -64,20 +64,20 @@ def client(tmp_path):
     try:
         s.add(orm.SampleORM(
             sample_id="sample_a",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
         ))
         s.add(orm.AcquisitionORM(sample_id="sample_a", acquisition_id="acq1"))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_a", acquisition_id="acq1", tomogram_id="t1",
             mrc_path=str(mrc_path),
         ))
         # Tomogram with no mrc_path
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_a", acquisition_id="acq1", tomogram_id="t_nopath",
         ))
         # Tomogram with mrc_path that doesn't exist on disk
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_a", acquisition_id="acq1", tomogram_id="t_missing",
             mrc_path=str(data_root / "sample_a" / "acq1" / "missing.mrc"),
         ))
@@ -85,12 +85,12 @@ def client(tmp_path):
         import time
         s.add(orm.SampleORM(
             sample_id="sample_dead",
-            data_source=DataSource.cryoet,
+            data_source=DataSource.experimental,
             project=Project.chromatin,
             deleted_at=time.time(),
         ))
         s.add(orm.AcquisitionORM(sample_id="sample_dead", acquisition_id="acq1"))
-        s.add(orm.TomogramORM(
+        s.add(orm.PostProcessedTomogramORM(
             sample_id="sample_dead", acquisition_id="acq1", tomogram_id="t1",
             mrc_path=str(mrc_path),
         ))
