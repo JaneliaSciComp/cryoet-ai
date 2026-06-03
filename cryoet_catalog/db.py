@@ -1,14 +1,14 @@
 """SQLAlchemy engine + session helpers for the CryoET catalog.
 
-Schema initialization is delegated to Alembic. ``init_schema(engine)`` runs
-``alembic upgrade head`` against the engine. See
-``cryoet_catalog/migrations/README.md``.
+``init_schema(engine)`` creates the ORM tables directly via
+``Base.metadata.create_all`` for now — Alembic is wired up (see
+``cryoet_catalog/migrations/``) but deferred until production, when the
+first real revision will be needed.
 """
 
 from __future__ import annotations
 
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Iterator
 
 from sqlalchemy import Engine, create_engine
@@ -16,42 +16,25 @@ from sqlalchemy.orm import Session, sessionmaker
 
 DEFAULT_DB_URL = "sqlite:///cryoet_catalog.db"
 
-_MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
-_ALEMBIC_INI = _MIGRATIONS_DIR / "alembic.ini"
-
 
 def make_engine(url: str = DEFAULT_DB_URL) -> Engine:
     """Create a SQLAlchemy engine. Accepts any URL — sqlite:// or postgresql://."""
     return create_engine(url, future=True)
 
 
-def _alembic_cfg(engine: Engine):
-    """Build an Alembic Config bound to ``engine`` for in-process use.
-
-    The config file lives next to the migrations directory and is the same
-    one the ``pixi run migrate`` task uses. We override ``sqlalchemy.url``
-    from the engine and stash a live connection in ``cfg.attributes`` so
-    ``env.py`` can use it directly (avoiding a second engine for the same
-    DB, which on SQLite means a second file handle).
-    """
-    from alembic.config import Config  # local import: alembic is optional
-
-    cfg = Config(str(_ALEMBIC_INI))
-    cfg.set_main_option("script_location", str(_MIGRATIONS_DIR))
-    cfg.set_main_option("sqlalchemy.url", str(engine.url))
-    cfg.attributes["connection"] = engine
-    return cfg
-
-
 def init_schema(engine: Engine) -> None:
-    """Bring the DB at ``engine`` up to the head ORM revision via Alembic.
+    """Create every ORM-declared table on ``engine`` if it isn't there.
 
-    Runs ``alembic upgrade head``. Works for both fresh DBs and any DB
-    already under Alembic management.
+    Pre-production shortcut: no Alembic, no migration history. When prod
+    arrives, switch this back to ``alembic upgrade head`` and add the
+    first revision under ``cryoet_catalog/migrations/versions/``.
     """
-    from alembic import command  # local import: alembic is optional
+    # Local import keeps this module light when only ``make_engine`` /
+    # ``session_scope`` are needed (e.g. by callers that don't bootstrap
+    # the schema themselves).
+    from cryoet_catalog.orm import Base
 
-    command.upgrade(_alembic_cfg(engine), "head")
+    Base.metadata.create_all(engine)
 
 
 @contextmanager
