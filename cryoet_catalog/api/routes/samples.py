@@ -12,16 +12,19 @@ from cryoet_catalog.api.deps import get_session
 from cryoet_catalog.api.schemas import (
     AcquisitionOut,
     AnnotationOut,
-    AunpOut,
     ChromatinOut,
+    FiducialOut,
     FreezingOut,
+    LabelOut,
+    MdRunOut,
+    MdSourceOut,
     MillingOut,
+    PostProcessedTomogramOut,
+    RawTomogramOut,
     SampleDetail,
     SampleSummary,
     SimulationOut,
-    SynapseOut,
     TiltSeriesOut,
-    TomogramOut,
 )
 
 router = APIRouter()
@@ -36,7 +39,7 @@ def _enum_val(v):
 # table has ``sample_id`` as its PK so we can fetch via ``session.get``.
 _SUB_ENTITY_MAP: tuple[tuple[str, type, type], ...] = (
     ("chromatin", orm.ChromatinORM, ChromatinOut),
-    ("synapse", orm.SynapseORM, SynapseOut),
+    ("fiducial", orm.FiducialORM, FiducialOut),
     ("simulation", orm.SimulationORM, SimulationOut),
     ("freezing", orm.FreezingORM, FreezingOut),
     ("milling", orm.MillingORM, MillingOut),
@@ -55,6 +58,18 @@ def _build_sub_entity(row, out_cls: type):
     return out_cls(**values)
 
 
+def _tomogram_range_or_clause(
+    column, lo: float | None, hi: float | None
+) -> list:
+    """Build NULL-tolerant range clauses for one tomogram column."""
+    conds = []
+    if lo is not None:
+        conds.append(or_(column.is_(None), column >= lo))
+    if hi is not None:
+        conds.append(or_(column.is_(None), column <= hi))
+    return conds
+
+
 @router.get("", response_model=list[SampleSummary])
 def list_samples(
     project: list[str] | None = Query(None),
@@ -65,8 +80,8 @@ def list_samples(
     camera: list[str] | None = Query(None),
     pixel_size_min: float | None = Query(None),
     pixel_size_max: float | None = Query(None),
-    voxel_spacing_min: float | None = Query(None),
-    voxel_spacing_max: float | None = Query(None),
+    voxel_size_min: float | None = Query(None),
+    voxel_size_max: float | None = Query(None),
     n_tilts_min: int | None = Query(None),
     n_tilts_max: int | None = Query(None),
     image_format: list[str] | None = Query(None),
@@ -82,13 +97,14 @@ def list_samples(
     """Paginated list of live samples (deleted_at IS NULL) with filters and
     intrinsic child-row counts (n_acquisitions/n_tomograms/n_tilt_series).
 
-    Filter semantics (plan §7.1, decision §11.15):
+    Filter semantics:
       * Repeatable categorical params act as OR within a facet, AND across.
       * Acquisition/tomogram/tilt_series filters use EXISTS subqueries on the
         respective child table.
       * Range filters are NULL-tolerant: a child row with NULL on the bound
         column is treated as a match (so partial metadata doesn't drop the
         whole sample).
+      * Tomogram filters/counts span both raw + post-processed tables.
       * Counts on the SELECT list are filter-INDEPENDENT total child rows.
     """
     # ── Subqueries ────────────────────────────────────────────────────────
@@ -110,10 +126,17 @@ def list_samples(
         .correlate(orm.SampleORM)
         .scalar_subquery()
     )
-    n_tomo_sq = (
+    n_raw_tomo_sq = (
         select(func.count())
-        .select_from(orm.TomogramORM)
-        .where(orm.TomogramORM.sample_id == orm.SampleORM.sample_id)
+        .select_from(orm.RawTomogramORM)
+        .where(orm.RawTomogramORM.sample_id == orm.SampleORM.sample_id)
+        .correlate(orm.SampleORM)
+        .scalar_subquery()
+    )
+    n_post_tomo_sq = (
+        select(func.count())
+        .select_from(orm.PostProcessedTomogramORM)
+        .where(orm.PostProcessedTomogramORM.sample_id == orm.SampleORM.sample_id)
         .correlate(orm.SampleORM)
         .scalar_subquery()
     )
@@ -130,7 +153,7 @@ def list_samples(
             orm.SampleORM,
             func.coalesce(warn_count_sq.c.wc, 0).label("warning_count"),
             n_acq_sq.label("n_acquisitions"),
-            n_tomo_sq.label("n_tomograms"),
+            (n_raw_tomo_sq + n_post_tomo_sq).label("n_tomograms"),
             n_ts_sq.label("n_tilt_series"),
         )
         .outerjoin(warn_count_sq, warn_count_sq.c.sample_id == orm.SampleORM.sample_id)
@@ -180,41 +203,65 @@ def list_samples(
             exists(select(1).where(and_(*acq_conds)).correlate(orm.SampleORM))
         )
 
-    # ── Tomogram EXISTS filters ───────────────────────────────────────────
-    tomo_conds = [orm.TomogramORM.sample_id == orm.SampleORM.sample_id]
-    if voxel_spacing_min is not None:
-        tomo_conds.append(
-            or_(
-                orm.TomogramORM.voxel_spacing_angstrom.is_(None),
-                orm.TomogramORM.voxel_spacing_angstrom >= voxel_spacing_min,
+    # ── Tomogram EXISTS filters (apply across raw + post tables) ──────────
+    if voxel_size_min is not None or voxel_size_max is not None:
+        raw_conds = [orm.RawTomogramORM.sample_id == orm.SampleORM.sample_id]
+        raw_conds.extend(
+            _tomogram_range_or_clause(
+                orm.RawTomogramORM.voxel_size, voxel_size_min, voxel_size_max
             )
         )
-    if voxel_spacing_max is not None:
-        tomo_conds.append(
-            or_(
-                orm.TomogramORM.voxel_spacing_angstrom.is_(None),
-                orm.TomogramORM.voxel_spacing_angstrom <= voxel_spacing_max,
+        post_conds = [
+            orm.PostProcessedTomogramORM.sample_id == orm.SampleORM.sample_id
+        ]
+        post_conds.extend(
+            _tomogram_range_or_clause(
+                orm.PostProcessedTomogramORM.voxel_size,
+                voxel_size_min,
+                voxel_size_max,
             )
         )
-    if len(tomo_conds) > 1:
         stmt = stmt.where(
-            exists(select(1).where(and_(*tomo_conds)).correlate(orm.SampleORM))
+            or_(
+                exists(select(1).where(and_(*raw_conds)).correlate(orm.SampleORM)),
+                exists(select(1).where(and_(*post_conds)).correlate(orm.SampleORM)),
+            )
         )
 
     if has_tomograms is True:
         stmt = stmt.where(
-            exists(
-                select(1)
-                .where(orm.TomogramORM.sample_id == orm.SampleORM.sample_id)
-                .correlate(orm.SampleORM)
+            or_(
+                exists(
+                    select(1)
+                    .where(orm.RawTomogramORM.sample_id == orm.SampleORM.sample_id)
+                    .correlate(orm.SampleORM)
+                ),
+                exists(
+                    select(1)
+                    .where(
+                        orm.PostProcessedTomogramORM.sample_id
+                        == orm.SampleORM.sample_id
+                    )
+                    .correlate(orm.SampleORM)
+                ),
             )
         )
     elif has_tomograms is False:
         stmt = stmt.where(
-            ~exists(
-                select(1)
-                .where(orm.TomogramORM.sample_id == orm.SampleORM.sample_id)
-                .correlate(orm.SampleORM)
+            and_(
+                ~exists(
+                    select(1)
+                    .where(orm.RawTomogramORM.sample_id == orm.SampleORM.sample_id)
+                    .correlate(orm.SampleORM)
+                ),
+                ~exists(
+                    select(1)
+                    .where(
+                        orm.PostProcessedTomogramORM.sample_id
+                        == orm.SampleORM.sample_id
+                    )
+                    .correlate(orm.SampleORM)
+                ),
             )
         )
 
@@ -278,6 +325,12 @@ def list_samples(
     ]
 
 
+def _row_to_out(row, out_cls: type):
+    """Map a row to an XxxOut by copying only declared fields."""
+    field_names = out_cls.model_fields.keys()
+    return out_cls(**{name: getattr(row, name, None) for name in field_names})
+
+
 @router.get("/{sample_id}", response_model=SampleDetail)
 def get_sample(sample_id: str, session: Session = Depends(get_session)):
     """Full sample record with typed sub-entities, acquisitions, tomograms,
@@ -287,28 +340,37 @@ def get_sample(sample_id: str, session: Session = Depends(get_session)):
     if sample is None or sample.deleted_at is not None:
         raise HTTPException(status_code=404, detail="sample not found")
 
-    # Typed sub-entities (decision §11.18).
+    # 1:1 sub-entities.
     sub: dict[str, object | None] = {}
     for attr_name, sub_orm, out_cls in _SUB_ENTITY_MAP:
         row = session.get(sub_orm, sample_id)
         sub[attr_name] = _build_sub_entity(row, out_cls)
 
-    aunp_rows = (
+    # Labels (ordinal-keyed list).
+    label_rows = (
         session.execute(
-            select(orm.AunpORM)
-            .where(orm.AunpORM.sample_id == sample_id)
-            .order_by(orm.AunpORM.ordinal)
+            select(orm.LabelORM)
+            .where(orm.LabelORM.sample_id == sample_id)
+            .order_by(orm.LabelORM.ordinal)
         )
         .scalars()
         .all()
     )
-    aunp_field_names = AunpOut.model_fields.keys()
-    aunp_out = [
-        AunpOut(**{name: getattr(a, name, None) for name in aunp_field_names})
-        for a in aunp_rows
-    ]
+    labels = [_row_to_out(r, LabelOut) for r in label_rows]
 
-    # Acquisitions + tomograms + annotations + tilt_series.
+    # MD runs (id-keyed list).
+    md_run_rows = (
+        session.execute(
+            select(orm.MdRunORM)
+            .where(orm.MdRunORM.sample_id == sample_id)
+            .order_by(orm.MdRunORM.md_run_id)
+        )
+        .scalars()
+        .all()
+    )
+    md_runs = [_row_to_out(r, MdRunOut) for r in md_run_rows]
+
+    # Acquisitions + per-acq children.
     acqs = (
         session.execute(
             select(orm.AcquisitionORM)
@@ -320,16 +382,29 @@ def get_sample(sample_id: str, session: Session = Depends(get_session)):
     )
     acq_out: list[AcquisitionOut] = []
     for a in acqs:
-        tomos = (
+        # At-most-one raw tomogram per acquisition (enforced by
+        # AcquisitionFile.raw_tomogram in the schema). Query rather than
+        # session.get since the PK is composite and tomogram_id varies.
+        raw_row = session.execute(
+            select(orm.RawTomogramORM)
+            .where(orm.RawTomogramORM.sample_id == sample_id)
+            .where(orm.RawTomogramORM.acquisition_id == a.acquisition_id)
+            .limit(1)
+        ).scalar_one_or_none()
+
+        post_rows = (
             session.execute(
-                select(orm.TomogramORM)
-                .where(orm.TomogramORM.sample_id == sample_id)
-                .where(orm.TomogramORM.acquisition_id == a.acquisition_id)
-                .order_by(orm.TomogramORM.tomogram_id)
+                select(orm.PostProcessedTomogramORM)
+                .where(orm.PostProcessedTomogramORM.sample_id == sample_id)
+                .where(
+                    orm.PostProcessedTomogramORM.acquisition_id == a.acquisition_id
+                )
+                .order_by(orm.PostProcessedTomogramORM.tomogram_id)
             )
             .scalars()
             .all()
         )
+
         anns = (
             session.execute(
                 select(orm.AnnotationORM)
@@ -350,36 +425,24 @@ def get_sample(sample_id: str, session: Session = Depends(get_session)):
             .scalars()
             .all()
         )
-        ts_field_names = TiltSeriesOut.model_fields.keys()
+        md_source_row = session.get(
+            orm.MdSourceORM, (sample_id, a.acquisition_id)
+        )
+
         acq_out.append(
             AcquisitionOut(
                 acquisition_id=a.acquisition_id,
                 resolution=a.resolution,
                 microscope=a.microscope,
+                quality=a.quality,
                 pixel_size=a.pixel_size,
                 voltage=a.voltage,
                 camera=a.camera,
                 path=a.path,
-                tomograms=[
-                    TomogramOut(
-                        tomogram_id=t.tomogram_id,
-                        pipeline=t.pipeline,
-                        software=t.software,
-                        voxel_bin=t.voxel_bin,
-                        voxel_spacing_angstrom=t.voxel_spacing_angstrom,
-                        voxel_spacing_angstrom_implied=t.voxel_spacing_angstrom_implied,
-                        derived_from=t.derived_from or [],
-                        is_raw=t.is_raw,
-                        image_size_x=t.image_size_x,
-                        image_size_y=t.image_size_y,
-                        image_size_z=t.image_size_z,
-                        mrc_path=t.mrc_path,
-                        zarr_path=t.zarr_path,
-                        zarr_axes=t.zarr_axes,
-                        zarr_scale=t.zarr_scale,
-                        size_bytes=t.size_bytes,
-                    )
-                    for t in tomos
+                md_source=_build_sub_entity(md_source_row, MdSourceOut),
+                raw_tomogram=_row_to_out(raw_row, RawTomogramOut) if raw_row else None,
+                post_processed_tomograms=[
+                    _row_to_out(t, PostProcessedTomogramOut) for t in post_rows
                 ],
                 annotations=[
                     AnnotationOut(
@@ -390,12 +453,7 @@ def get_sample(sample_id: str, session: Session = Depends(get_session)):
                     )
                     for ann in anns
                 ],
-                tilt_series=[
-                    TiltSeriesOut(
-                        **{name: getattr(ts, name, None) for name in ts_field_names}
-                    )
-                    for ts in ts_rows
-                ],
+                tilt_series=[_row_to_out(ts, TiltSeriesOut) for ts in ts_rows],
             )
         )
 
@@ -407,10 +465,11 @@ def get_sample(sample_id: str, session: Session = Depends(get_session)):
         cell_type=sample.cell_type,
         description=sample.description,
         chromatin=sub["chromatin"],
-        synapse=sub["synapse"],
+        fiducial=sub["fiducial"],
         simulation=sub["simulation"],
         freezing=sub["freezing"],
         milling=sub["milling"],
-        aunp=aunp_out,
+        label=labels,
+        md_run=md_runs,
         acquisitions=acq_out,
     )

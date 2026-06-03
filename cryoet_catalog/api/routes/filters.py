@@ -118,20 +118,45 @@ def get_filter_options(session: Session = Depends(get_session)):
     ).one()
     pixel_size = RangeOut(min=pixel_size_row[0], max=pixel_size_row[1])
 
-    voxel_spacing_row = session.execute(
+    # voxel_size: union the min/max across both tomogram tables. Two
+    # cheap aggregate queries beat the dialect-quirks of UNION inside an
+    # aggregate.
+    raw_voxel_row = session.execute(
         select(
-            func.min(orm.TomogramORM.voxel_spacing_angstrom),
-            func.max(orm.TomogramORM.voxel_spacing_angstrom),
+            func.min(orm.RawTomogramORM.voxel_size),
+            func.max(orm.RawTomogramORM.voxel_size),
         )
         .join(
             orm.SampleORM,
-            orm.SampleORM.sample_id == orm.TomogramORM.sample_id,
+            orm.SampleORM.sample_id == orm.RawTomogramORM.sample_id,
         )
         .where(orm.SampleORM.deleted_at.is_(None))
-        .where(orm.TomogramORM.voxel_spacing_angstrom.is_not(None))
+        .where(orm.RawTomogramORM.voxel_size.is_not(None))
     ).one()
-    voxel_spacing = RangeOut(
-        min=voxel_spacing_row[0], max=voxel_spacing_row[1]
+    post_voxel_row = session.execute(
+        select(
+            func.min(orm.PostProcessedTomogramORM.voxel_size),
+            func.max(orm.PostProcessedTomogramORM.voxel_size),
+        )
+        .join(
+            orm.SampleORM,
+            orm.SampleORM.sample_id == orm.PostProcessedTomogramORM.sample_id,
+        )
+        .where(orm.SampleORM.deleted_at.is_(None))
+        .where(orm.PostProcessedTomogramORM.voxel_size.is_not(None))
+    ).one()
+
+    def _safe_min(*vals):
+        present = [v for v in vals if v is not None]
+        return min(present) if present else None
+
+    def _safe_max(*vals):
+        present = [v for v in vals if v is not None]
+        return max(present) if present else None
+
+    voxel_size = RangeOut(
+        min=_safe_min(raw_voxel_row[0], post_voxel_row[0]),
+        max=_safe_max(raw_voxel_row[1], post_voxel_row[1]),
     )
 
     n_tilts_row = session.execute(
@@ -157,6 +182,6 @@ def get_filter_options(session: Session = Depends(get_session)):
         cameras=cameras,
         image_formats=image_formats,
         pixel_size=pixel_size,
-        voxel_spacing=voxel_spacing,
+        voxel_size=voxel_size,
         n_tilts=n_tilts,
     )

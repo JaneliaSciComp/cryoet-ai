@@ -50,7 +50,11 @@ def get_stats_overview(session: Session = Depends(get_session)):
 
     acquisitions_total = _count_live(session, orm.AcquisitionORM)
     tilt_series_total = _count_live(session, orm.TiltSeriesORM)
-    tomograms_total = _count_live(session, orm.TomogramORM)
+    # tomograms_total spans raw + post-processed tables.
+    tomograms_total = (
+        _count_live(session, orm.RawTomogramORM)
+        + _count_live(session, orm.PostProcessedTomogramORM)
+    )
     annotations_total = _count_live(session, orm.AnnotationORM)
 
     # Warnings: only count rows from the most recent completed scan.
@@ -101,33 +105,52 @@ def get_stats_overview(session: Session = Depends(get_session)):
         .group_by(orm.SampleORM.project)
     ).all())
 
-    # tomograms per project
-    tomograms_by_project = dict(session.execute(
+    # tomograms per project — sum of raw + post-processed.
+    raw_tomos_by_project = dict(session.execute(
         select(
             orm.SampleORM.project,
             func.count(),
         )
-        .select_from(orm.TomogramORM)
+        .select_from(orm.RawTomogramORM)
         .join(
             orm.SampleORM,
-            orm.SampleORM.sample_id == orm.TomogramORM.sample_id,
+            orm.SampleORM.sample_id == orm.RawTomogramORM.sample_id,
         )
         .where(orm.SampleORM.deleted_at.is_(None))
         .group_by(orm.SampleORM.project)
     ).all())
+    post_tomos_by_project = dict(session.execute(
+        select(
+            orm.SampleORM.project,
+            func.count(),
+        )
+        .select_from(orm.PostProcessedTomogramORM)
+        .join(
+            orm.SampleORM,
+            orm.SampleORM.sample_id == orm.PostProcessedTomogramORM.sample_id,
+        )
+        .where(orm.SampleORM.deleted_at.is_(None))
+        .group_by(orm.SampleORM.project)
+    ).all())
+    tomograms_by_project: dict = {}
+    for p in set(raw_tomos_by_project) | set(post_tomos_by_project):
+        tomograms_by_project[p] = (
+            raw_tomos_by_project.get(p, 0) + post_tomos_by_project.get(p, 0)
+        )
 
-    # size_bytes per project (NULL → 0 via COALESCE)
+    # size_bytes per project — only PostProcessedTomogram has size_bytes
+    # (raw has no such field in the schema).
     size_by_project = dict(session.execute(
         select(
             orm.SampleORM.project,
             func.coalesce(func.sum(
-                func.coalesce(orm.TomogramORM.size_bytes, 0)
+                func.coalesce(orm.PostProcessedTomogramORM.size_bytes, 0)
             ), 0),
         )
-        .select_from(orm.TomogramORM)
+        .select_from(orm.PostProcessedTomogramORM)
         .join(
             orm.SampleORM,
-            orm.SampleORM.sample_id == orm.TomogramORM.sample_id,
+            orm.SampleORM.sample_id == orm.PostProcessedTomogramORM.sample_id,
         )
         .where(orm.SampleORM.deleted_at.is_(None))
         .group_by(orm.SampleORM.project)

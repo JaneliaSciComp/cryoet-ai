@@ -33,12 +33,22 @@ router = APIRouter()
 
 def _lookup_tomogram(
     session: Session, sample_id: str, acquisition_id: str, tomogram_id: str
-) -> orm.TomogramORM:
-    """Return the tomogram row or raise 404 (incl. soft-deleted parent samples)."""
+) -> orm.RawTomogramORM | orm.PostProcessedTomogramORM:
+    """Return the tomogram row or raise 404 (incl. soft-deleted parent samples).
+
+    Raw and post-processed tomograms share one id namespace within an
+    acquisition (the assembler ensures no collision), so at most one of the
+    two tables holds a row for any (sample_id, acquisition_id, tomogram_id)
+    triple. Post-processed is checked first because preview/Neuroglancer
+    requests target denoised tomograms far more often than raw.
+    """
     sample = session.get(orm.SampleORM, sample_id)
     if sample is None or sample.deleted_at is not None:
         raise HTTPException(status_code=404, detail="sample not found")
-    row = session.get(orm.TomogramORM, (sample_id, acquisition_id, tomogram_id))
+    pk = (sample_id, acquisition_id, tomogram_id)
+    row = session.get(orm.PostProcessedTomogramORM, pk)
+    if row is None:
+        row = session.get(orm.RawTomogramORM, pk)
     if row is None:
         raise HTTPException(status_code=404, detail="tomogram not found")
     return row
