@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
-import { Link } from '@mui/material'
 import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from 'material-react-table'
 import type { AcquisitionOut } from '~/types'
+import { CustomLink } from '~/components/CustomLink'
 import { PreviewThumbnail } from '~/components/common/Thumbnail'
 
 // Mirrors the API's `n_tomograms` semantics: raw + post-processed combined.
@@ -56,15 +56,13 @@ export function SampleAcquisitionsTable(props: {
         header: 'Acquisition id',
         minSize: 160,
         Cell: ({ row }) => (
-          // The acquisition detail view isn't built yet; link to its eventual
-          // URL. Swap to a typed `CustomLink` once that route exists.
-          <Link
-            href={`/samples/${encodeURIComponent(
-              sampleId,
-            )}/acquisitions/${encodeURIComponent(row.original.acquisition_id)}`}
+          <CustomLink
+            to="/acquisitions/$acquisitionId"
+            params={{ acquisitionId: row.original.acquisition_id }}
+            search={{ sampleId }}
           >
             {row.original.acquisition_id}
-          </Link>
+          </CustomLink>
         ),
       },
       {
