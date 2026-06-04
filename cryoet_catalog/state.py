@@ -18,6 +18,7 @@ from cryoet_catalog.orm import (
     CatalogMetaORM,
     SampleORM,
     ScansORM,
+    ScanSamplesORM,
     ScanStateORM,
 )
 
@@ -186,3 +187,45 @@ def finish_scan(
             samples_failed=failed,
         )
     )
+    _record_scan_membership(session, scan_run_id, report)
+
+
+def _record_scan_membership(
+    session: Session, scan_run_id: str, report: Any
+) -> None:
+    """Persist which samples were upserted/skipped/failed for this run.
+
+    Idempotent: clears any prior rows for ``scan_run_id`` first, so the
+    failure path (``finish_scan`` called twice) doesn't double-insert.
+    Failed samples are deduplicated by ``sample_id`` (a single sample can
+    surface multiple error strings).
+    """
+    session.execute(
+        delete(ScanSamplesORM).where(ScanSamplesORM.scan_run_id == scan_run_id)
+    )
+
+    for sample_id in getattr(report, "upserted_ids", []) or []:
+        session.add(
+            ScanSamplesORM(
+                scan_run_id=scan_run_id, sample_id=sample_id, outcome="upserted"
+            )
+        )
+    for sample_id in getattr(report, "skipped_ids", []) or []:
+        session.add(
+            ScanSamplesORM(
+                scan_run_id=scan_run_id, sample_id=sample_id, outcome="skipped"
+            )
+        )
+    seen_failed: set[str] = set()
+    for sample_id, detail in getattr(report, "failed_samples", []) or []:
+        if sample_id in seen_failed:
+            continue
+        seen_failed.add(sample_id)
+        session.add(
+            ScanSamplesORM(
+                scan_run_id=scan_run_id,
+                sample_id=sample_id,
+                outcome="failed",
+                detail=detail or None,
+            )
+        )

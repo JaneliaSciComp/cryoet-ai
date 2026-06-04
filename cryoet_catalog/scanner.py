@@ -33,6 +33,12 @@ class ScanReport:
     soft_deleted: int = 0
     # populated only on prune_dry_run=True
     would_soft_delete: list[str] | None = None
+    # Per-sample membership behind the counts above, persisted to scan_samples
+    # so the /manage view can list which samples sit behind each tally.
+    upserted_ids: list[str] = field(default_factory=list)
+    skipped_ids: list[str] = field(default_factory=list)
+    # (sample_id, error message) — sample-level failures only.
+    failed_samples: list[tuple[str, str]] = field(default_factory=list)
 
 
 def scan_root(
@@ -93,6 +99,7 @@ def scan_root(
                 if session.in_transaction():
                     session.rollback()
                 report.errors.append(f"{sample_loc.sample_id}: {e}")
+                report.failed_samples.append((sample_loc.sample_id, str(e)))
                 if on_error == "raise":
                     raise
 
@@ -161,6 +168,7 @@ def _scan_one_sample(
         and not any(state.is_file_changed(sample_state, p) for p in parse_targets)
     ):
         report.skipped += 1
+        report.skipped_ids.append(sample_loc.sample_id)
         return
 
     # Assemble + persist in one transaction
@@ -172,6 +180,9 @@ def _scan_one_sample(
         if result.record is None:
             report.errors.extend(
                 f"{sample_loc.sample_id}: {e}" for e in result.errors
+            )
+            report.failed_samples.append(
+                (sample_loc.sample_id, "; ".join(result.errors))
             )
             return
         for e in result.errors:
@@ -196,6 +207,7 @@ def _scan_one_sample(
             session, sample_loc.sample_id, kept_paths=set(parse_targets)
         )
         report.upserted += 1
+        report.upserted_ids.append(sample_loc.sample_id)
 
 
 __all__ = ["ScanReport", "scan_root"]

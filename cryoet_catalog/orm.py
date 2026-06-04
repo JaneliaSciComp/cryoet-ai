@@ -436,6 +436,31 @@ class ScanWarningsORM(Base):
     )
 
 
+class ScanSamplesORM(Base):
+    """Per-sample outcome for a scan run: which samples were upserted, skipped,
+    or failed. The ``scans`` row keeps only aggregate counts; this table records
+    the membership so the /manage view can list the samples behind each count.
+
+    No FK on ``sample_id`` — a failed sample may never have been persisted to
+    ``samples`` (its parse/assemble step is what failed).
+    """
+
+    __tablename__ = "scan_samples"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scan_run_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("scans.scan_run_id"),
+        nullable=False,
+        index=True,
+    )
+    sample_id: Mapped[str] = mapped_column(String(_ID_MAX_LEN), nullable=False, index=True)
+    # One of: "upserted" | "skipped" | "failed".
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+    # Error message for failed samples; NULL otherwise.
+    detail: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class ScanStateORM(Base):
     __tablename__ = "scan_state"
 
