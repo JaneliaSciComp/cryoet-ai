@@ -9,8 +9,21 @@ function toArray(v: unknown): unknown {
   return Array.isArray(v) ? v : [v]
 }
 
+// `z.coerce.boolean()` treats EVERY non-empty string as true — including
+// "false" — so coerce the spellings explicitly instead. Accepts a native
+// boolean (TanStack Router's default search parser JSON-decodes `true`/`false`)
+// and the common string forms; anything unrecognized becomes `undefined` so
+// it's dropped rather than silently read as true.
+function toBoolean(v: unknown): boolean | undefined {
+  if (typeof v === 'boolean') return v
+  if (v === 'true' || v === '1') return true
+  if (v === 'false' || v === '0') return false
+  return undefined
+}
+
 const stringArray = z.preprocess(toArray, z.array(z.string()).optional())
 const numberArray = z.preprocess(toArray, z.array(z.coerce.number()).optional())
+const booleanish = z.preprocess(toBoolean, z.boolean().optional())
 
 // Search-param schema for the /samples route. Lives in utils (not the route or
 // the hook) so neither owner has to import the other (avoids circular deps).
@@ -29,7 +42,7 @@ export const samplesSearchSchema = z.object({
   voltage: numberArray,
   camera: stringArray,
   image_format: stringArray,
-  has_tomograms: z.coerce.boolean().optional(),
+  has_tomograms: booleanish,
   pixel_size_min: z.coerce.number().optional(),
   pixel_size_max: z.coerce.number().optional(),
   voxel_spacing_min: z.coerce.number().optional(),
