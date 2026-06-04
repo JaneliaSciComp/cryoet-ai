@@ -13,8 +13,6 @@ export function Header() {
       <AppBar position="static">
         <Toolbar sx={{ gap: 2 }}>
           <StyledCustomLink to="/">Home</StyledCustomLink>
-          <StyledCustomLink to="/samples">Samples</StyledCustomLink>
-          <StyledCustomLink to="/scans">Scans</StyledCustomLink>
         </Toolbar>
       </AppBar>
     </Box>

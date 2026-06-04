@@ -1,34 +1,15 @@
 import { useMemo } from 'react'
-import { Box } from '@mui/material'
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from 'material-react-table'
 import type { SampleSummary } from '~/types'
+import { CustomLink } from '~/components/CustomLink'
+import { ThumbnailPlaceholder } from '~/components/common/Thumbnail'
 import { AcquisitionsSubTable } from './AcquisitionsSubTable'
 
 const dash = (v: unknown) => (v == null || v === '' ? '—' : String(v))
-
-function Thumbnail() {
-  return (
-    <Box
-      sx={{
-        width: 56,
-        height: 40,
-        borderRadius: 1,
-        bgcolor: 'action.hover',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'text.disabled',
-      }}
-    >
-      <ImageOutlinedIcon fontSize="small" />
-    </Box>
-  )
-}
 
 export function SamplesPortalTable(props: {
   rows: SampleSummary[]
@@ -43,9 +24,21 @@ export function SamplesPortalTable(props: {
         header: '',
         columnDefType: 'display',
         size: 80,
-        Cell: () => <Thumbnail />,
+        Cell: () => <ThumbnailPlaceholder />,
       },
-      { accessorKey: 'sample_id', header: 'Sample id', minSize: 160 },
+      {
+        accessorKey: 'sample_id',
+        header: 'Sample id',
+        minSize: 160,
+        Cell: ({ row }) => (
+          <CustomLink
+            to="/samples/$sampleId"
+            params={{ sampleId: row.original.sample_id }}
+          >
+            {row.original.sample_id}
+          </CustomLink>
+        ),
+      },
       { accessorKey: 'data_source', header: 'Data source' },
       { accessorKey: 'project', header: 'Project' },
       {

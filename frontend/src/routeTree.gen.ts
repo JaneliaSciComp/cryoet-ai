@@ -9,95 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ScansRouteImport } from './routes/scans'
-import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SamplesIndexRouteImport } from './routes/samples/index'
-import { Route as SamplesSampleIdRouteImport } from './routes/samples/$sampleId'
+import { Route as SamplesSampleIdRouteImport } from './routes/samples.$sampleId'
 
-const ScansRoute = ScansRouteImport.update({
-  id: '/scans',
-  path: '/scans',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SamplesRoute = SamplesRouteImport.update({
-  id: '/samples',
-  path: '/samples',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SamplesIndexRoute = SamplesIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => SamplesRoute,
-} as any)
 const SamplesSampleIdRoute = SamplesSampleIdRouteImport.update({
-  id: '/$sampleId',
-  path: '/$sampleId',
-  getParentRoute: () => SamplesRoute,
+  id: '/samples/$sampleId',
+  path: '/samples/$sampleId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/samples': typeof SamplesRouteWithChildren
-  '/scans': typeof ScansRoute
   '/samples/$sampleId': typeof SamplesSampleIdRoute
-  '/samples/': typeof SamplesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/scans': typeof ScansRoute
   '/samples/$sampleId': typeof SamplesSampleIdRoute
-  '/samples': typeof SamplesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/samples': typeof SamplesRouteWithChildren
-  '/scans': typeof ScansRoute
   '/samples/$sampleId': typeof SamplesSampleIdRoute
-  '/samples/': typeof SamplesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/samples' | '/scans' | '/samples/$sampleId' | '/samples/'
+  fullPaths: '/' | '/samples/$sampleId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/scans' | '/samples/$sampleId' | '/samples'
-  id:
-    | '__root__'
-    | '/'
-    | '/samples'
-    | '/scans'
-    | '/samples/$sampleId'
-    | '/samples/'
+  to: '/' | '/samples/$sampleId'
+  id: '__root__' | '/' | '/samples/$sampleId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SamplesRoute: typeof SamplesRouteWithChildren
-  ScansRoute: typeof ScansRoute
+  SamplesSampleIdRoute: typeof SamplesSampleIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/scans': {
-      id: '/scans'
-      path: '/scans'
-      fullPath: '/scans'
-      preLoaderRoute: typeof ScansRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/samples': {
-      id: '/samples'
-      path: '/samples'
-      fullPath: '/samples'
-      preLoaderRoute: typeof SamplesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -105,40 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/samples/': {
-      id: '/samples/'
-      path: '/'
-      fullPath: '/samples/'
-      preLoaderRoute: typeof SamplesIndexRouteImport
-      parentRoute: typeof SamplesRoute
-    }
     '/samples/$sampleId': {
       id: '/samples/$sampleId'
-      path: '/$sampleId'
+      path: '/samples/$sampleId'
       fullPath: '/samples/$sampleId'
       preLoaderRoute: typeof SamplesSampleIdRouteImport
-      parentRoute: typeof SamplesRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface SamplesRouteChildren {
-  SamplesSampleIdRoute: typeof SamplesSampleIdRoute
-  SamplesIndexRoute: typeof SamplesIndexRoute
-}
-
-const SamplesRouteChildren: SamplesRouteChildren = {
-  SamplesSampleIdRoute: SamplesSampleIdRoute,
-  SamplesIndexRoute: SamplesIndexRoute,
-}
-
-const SamplesRouteWithChildren =
-  SamplesRoute._addFileChildren(SamplesRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SamplesRoute: SamplesRouteWithChildren,
-  ScansRoute: ScansRoute,
+  SamplesSampleIdRoute: SamplesSampleIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

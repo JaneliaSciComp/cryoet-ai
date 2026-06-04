@@ -1,0 +1,112 @@
+import { useMemo } from 'react'
+import { Link } from '@mui/material'
+import {
+  MaterialReactTable,
+  useMaterialReactTable,
+  type MRT_ColumnDef,
+} from 'material-react-table'
+import type { AcquisitionOut } from '~/types'
+import { PreviewThumbnail } from '~/components/common/Thumbnail'
+
+// Mirrors the API's `n_tomograms` semantics: raw + post-processed combined.
+function tomogramCount(a: AcquisitionOut): number {
+  return (a.raw_tomogram ? 1 : 0) + a.post_processed_tomograms.length
+}
+
+// Center-tilt preview for the acquisition's first tilt series, served by the
+// `/tilt-series/.../preview.png` endpoint (proxied under `/api` in the
+// browser). Falls back to a placeholder when there's no tilt series or the
+// endpoint can't render one.
+function acquisitionPreviewSrc(
+  sampleId: string,
+  a: AcquisitionOut,
+): string | null {
+  const ts = a.tilt_series[0]
+  if (!ts) return null
+  return `/api/tilt-series/${encodeURIComponent(sampleId)}/${encodeURIComponent(
+    a.acquisition_id,
+  )}/${encodeURIComponent(ts.tilt_series_id)}/preview.png`
+}
+
+export function SampleAcquisitionsTable(props: {
+  sampleId: string
+  acquisitions: AcquisitionOut[]
+}) {
+  const { sampleId, acquisitions } = props
+
+  const columns = useMemo<MRT_ColumnDef<AcquisitionOut>[]>(
+    () => [
+      {
+        id: 'thumbnail',
+        header: '',
+        columnDefType: 'display',
+        enableSorting: false,
+        size: 140,
+        Cell: ({ row }) => (
+          <PreviewThumbnail
+            src={acquisitionPreviewSrc(sampleId, row.original)}
+            alt={`${row.original.acquisition_id} preview`}
+            width={96}
+            height={64}
+          />
+        ),
+      },
+      {
+        accessorKey: 'acquisition_id',
+        header: 'Acquisition id',
+        minSize: 160,
+        Cell: ({ row }) => (
+          // The acquisition detail view isn't built yet; link to its eventual
+          // URL. Swap to a typed `CustomLink` once that route exists.
+          <Link
+            href={`/samples/${encodeURIComponent(
+              sampleId,
+            )}/acquisitions/${encodeURIComponent(row.original.acquisition_id)}`}
+          >
+            {row.original.acquisition_id}
+          </Link>
+        ),
+      },
+      {
+        id: 'n_tilt_series',
+        header: 'Tilt series',
+        accessorFn: (a) => a.tilt_series.length,
+        size: 120,
+      },
+      {
+        id: 'n_tomograms',
+        header: 'Tomograms',
+        accessorFn: tomogramCount,
+        size: 120,
+      },
+      {
+        id: 'n_annotations',
+        header: 'Annotations',
+        accessorFn: (a) => a.annotations.length,
+        size: 120,
+      },
+    ],
+    [sampleId],
+  )
+
+  const table = useMaterialReactTable({
+    columns,
+    data: acquisitions,
+    getRowId: (a) => a.acquisition_id,
+    enableSorting: true,
+    enableColumnActions: false,
+    enableColumnFilters: false,
+    enableTopToolbar: false,
+    enableBottomToolbar: false,
+    enableDensityToggle: false,
+    enablePagination: false,
+    initialState: { density: 'comfortable' },
+    muiTablePaperProps: {
+      elevation: 0,
+      sx: { border: 1, borderColor: 'divider', borderRadius: 2 },
+    },
+    localization: { noRecordsToDisplay: 'No acquisitions for this sample.' },
+  })
+
+  return <MaterialReactTable table={table} />
+}

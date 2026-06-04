@@ -9,6 +9,7 @@ export type SampleSummary = {
   type: string | null
   cell_type: string | null
   description: string | null
+  path: string | null
   warning_count: number
   // Total child-row counts intrinsic to the sample — filter-independent.
   // ``n_tomograms`` is summed across raw + post-processed tables.
@@ -159,6 +160,7 @@ export type SampleDetail = {
   type: string | null
   cell_type: string | null
   description: string | null
+  path: string | null
   chromatin: ChromatinOut | null
   fiducial: FiducialOut | null
   simulation: SimulationOut | null
