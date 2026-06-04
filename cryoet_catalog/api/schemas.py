@@ -21,6 +21,7 @@ class SampleSummary(BaseModel):
     type: str | None = None
     cell_type: str | None = None
     description: str | None = None
+    path: str | None = None
     warning_count: int = 0
     # Total child-row counts intrinsic to the sample — filter-independent.
     # ``n_tomograms`` is summed across raw + post-processed tables.
@@ -177,6 +178,7 @@ class SampleDetail(BaseModel):
     type: str | None = None
     cell_type: str | None = None
     description: str | None = None
+    path: str | None = None
     chromatin: ChromatinOut | None = None
     fiducial: FiducialOut | None = None
     simulation: SimulationOut | None = None

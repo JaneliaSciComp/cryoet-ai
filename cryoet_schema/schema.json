@@ -578,6 +578,10 @@
         "description": {
           "title": "Description",
           "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
         }
       },
       "required": [

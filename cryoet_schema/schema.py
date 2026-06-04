@@ -139,6 +139,10 @@ class Sample(_Base):
     type: str | None = None
     cell_type: str | None = None
     description: str | None = None
+    # directory (sample directory; surfaced for the UI's copy-path /
+    # open-in-file-browser buttons — works even for samples with no
+    # acquisitions)
+    path: str | None = None
 
 
 class Simulation(_Base):

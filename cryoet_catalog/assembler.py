@@ -185,6 +185,12 @@ def assemble_sample(sample_loc: SampleLocation) -> AssemblyResult:
 
     record = record.model_copy(update={"acquisitions": new_acquisitions})
 
+    # Record the sample directory once so sample-level UI actions (copy path,
+    # open in Fileglancer) work even for samples with zero acquisitions.
+    # Mirrors the per-acquisition path injection below.
+    if record.sample.path is None:
+        record.sample.path = str(sample_loc.path)
+
     # ── Steps 2, 3, 4: walk each acquisition ─────────────────────────────────
     MDOC_FIELDS = (
         "pixel_size",

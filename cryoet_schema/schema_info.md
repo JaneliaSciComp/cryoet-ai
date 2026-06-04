@@ -34,6 +34,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 | `type` | text | `sample.toml` (`[sample]`) | e.g. `cellular` / `reconstituted`. [researcher: Cellular vs Reconstituted branch] |
 | `cell_type` | text | `sample.toml` (`[sample]`) | Required when `type = cellular`. [researcher: Cell type] |
 | `description` | text | `sample.toml` (`[sample]`) | Free text. |
+| `path` | text | `directory` | Absolute sample-directory path; surfaced for the UI's copy-path / open-in-file-browser buttons. Works even for samples with no acquisitions. |
 
 ### 1a. Chromatin sub-entity (one row per sample when `project = chromatin`)
 

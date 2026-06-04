@@ -121,6 +121,32 @@ def test_assembler_records_acquisition_path_for_synthesized(
     assert acq.path == str(sample_dir / "Pos1")
 
 
+def test_assembler_records_sample_path(tmp_path: Path) -> None:
+    """The sample directory is recorded on ``sample.path``."""
+    sample_dir = tmp_path / "sample_c"
+    _write_minimal_sample_toml(sample_dir)
+    _write_minimal_acquisition_toml(sample_dir)
+
+    result = assemble_sample(_sample_loc(sample_dir))
+    assert result.record is not None
+    assert result.record.sample.path == str(sample_dir)
+
+
+def test_assembler_records_sample_path_with_no_acquisitions(
+    tmp_path: Path,
+) -> None:
+    """A sample with zero acquisitions still gets ``sample.path`` — this is the
+    whole point: sample-level copy-path / Fileglancer actions must work even
+    when there are no acquisitions to derive a path from."""
+    sample_dir = tmp_path / "sample_d"
+    _write_minimal_sample_toml(sample_dir)
+
+    result = assemble_sample(_sample_loc(sample_dir))
+    assert result.record is not None
+    assert result.record.acquisitions == {}
+    assert result.record.sample.path == str(sample_dir)
+
+
 def test_assembler_records_tomogram_size_bytes(tmp_path: Path) -> None:
     """``tomograms.size_bytes`` is recorded from the MRC file's on-disk size."""
     mrcfile_pkg = pytest.importorskip("mrcfile")

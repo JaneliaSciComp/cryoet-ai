@@ -46,6 +46,10 @@ class SampleORM(Base):
     type: Mapped[str | None] = mapped_column(String, nullable=True)
     cell_type: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Absolute sample-directory path; path-injected by the scanner (mirrors
+    # AcquisitionORM.path). Surfaced for the UI's copy-path / open-in-Fileglancer
+    # actions so they work even for samples with no acquisitions.
+    path: Mapped[str | None] = mapped_column(String, nullable=True)
     # DB-only: soft-delete timestamp
     deleted_at: Mapped[float | None] = mapped_column(Float, nullable=True)
 
