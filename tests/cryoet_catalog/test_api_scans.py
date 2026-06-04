@@ -270,3 +270,88 @@ def test_latest_samples_failed_has_detail_and_null_metadata(client):
 def test_latest_samples_rejects_unknown_outcome(client):
     r = client.get("/scans/latest/samples", params={"outcome": "bogus"})
     assert r.status_code == 422
+
+
+# ── GET /scans/{scan_run_id}/warnings ─────────────────────────────────────
+
+
+def test_scan_warnings_by_id_grouped_by_sample(client):
+    r = client.get("/scans/run-completed/warnings")
+    assert r.status_code == 200
+    by_sample = {g["sample_id"]: g["warnings"] for g in r.json()}
+    assert set(by_sample) == {"sample-1", "sample-2"}
+    assert by_sample["sample-1"] == [
+        "sample-1 warning 1",
+        "sample-1 warning 2",
+        "sample-1 warning 3",
+    ]
+    assert len(by_sample["sample-2"]) == 5
+
+
+def test_scan_warnings_by_id_empty_for_scan_without_warnings(client):
+    # ``run-failed`` recorded no warnings — an empty list, not a 404.
+    r = client.get("/scans/run-failed/warnings")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_scan_warnings_by_id_404_for_unknown(client):
+    r = client.get("/scans/does-not-exist/warnings")
+    assert r.status_code == 404
+
+
+# ── GET /scans/{scan_run_id}/samples ──────────────────────────────────────
+
+
+def test_scan_samples_by_id_upserted_joins_metadata(client):
+    r = client.get("/scans/run-completed/samples", params={"outcome": "upserted"})
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) == 1
+    row = body[0]
+    assert row["sample_id"] == "sample-2"
+    assert row["data_source"] == "experimental"
+    assert row["project"] == "chromatin"
+    assert row["type"] == "type-b"
+    assert row["warning_count"] == 5
+    assert row["detail"] is None
+
+
+def test_scan_samples_by_id_skipped(client):
+    r = client.get("/scans/run-completed/samples", params={"outcome": "skipped"})
+    assert r.status_code == 200
+    body = r.json()
+    assert [row["sample_id"] for row in body] == ["sample-1"]
+    assert body[0]["warning_count"] == 3
+
+
+def test_scan_samples_by_id_failed_has_detail_and_null_metadata(client):
+    r = client.get("/scans/run-completed/samples", params={"outcome": "failed"})
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) == 1
+    row = body[0]
+    assert row["sample_id"] == "ghost-sample"
+    assert row["data_source"] is None
+    assert row["project"] is None
+    assert row["warning_count"] == 0
+    assert row["detail"] == "assemble failed: bad metadata"
+
+
+def test_scan_samples_by_id_empty_for_scan_without_membership(client):
+    # ``run-failed`` has no scan_samples rows — empty list, not a 404.
+    r = client.get("/scans/run-failed/samples", params={"outcome": "upserted"})
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_scan_samples_by_id_404_for_unknown(client):
+    r = client.get(
+        "/scans/does-not-exist/samples", params={"outcome": "upserted"}
+    )
+    assert r.status_code == 404
+
+
+def test_scan_samples_by_id_rejects_unknown_outcome(client):
+    r = client.get("/scans/run-completed/samples", params={"outcome": "bogus"})
+    assert r.status_code == 422
