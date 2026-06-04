@@ -1,4 +1,4 @@
-// Hand-written mirror of cryoet_catalog/api/schemas.py — keep in sync (decision §11.18).
+// Hand-written mirror of cryoet_catalog/api/schemas.py — keep in sync.
 
 // ── Sample list / summary ────────────────────────────────────────────────
 
@@ -10,12 +10,14 @@ export type SampleSummary = {
   cell_type: string | null
   description: string | null
   warning_count: number
+  // Total child-row counts intrinsic to the sample — filter-independent.
+  // ``n_tomograms`` is summed across raw + post-processed tables.
   n_acquisitions: number
   n_tomograms: number
   n_tilt_series: number
 }
 
-// ── Sample detail: typed sub-entities (decision §11.18) ──────────────────
+// ── Sample detail: typed sub-entities ────────────────────────────────────
 
 export type ChromatinOut = {
   substrate: string | null
@@ -34,9 +36,25 @@ export type ChromatinOut = {
   linker_length_fraction: number | null
 }
 
-export type SynapseOut = {
+export type LabelOut = {
+  ordinal: number
   label_target: string | null
-  label_strategy: string | null
+  aunp_type: string | null
+  // Polymorphic — single size or a list of sizes.
+  aunp_size_nm: number | number[] | null
+  conjugation: string | null
+  conjugation_target: string | null
+  fluorophore: string | null
+  notes: string | null
+}
+
+export type FiducialOut = {
+  aunp_size_nm: number | null
+  vendor: string | null
+  catalog_number: string | null
+  product_name: string | null
+  concentration_value: number | null
+  concentration_unit: string | null
 }
 
 export type SimulationOut = {
@@ -45,6 +63,7 @@ export type SimulationOut = {
 
 export type FreezingOut = {
   grid_type: string | null
+  solution_type: string | null
   cryoprotectant: string | null
   method: string | null
   planchette_size: string | null
@@ -54,29 +73,20 @@ export type FreezingOut = {
 export type MillingOut = {
   scheme: string | null
   date: string | null
+  quality: string | null
 }
 
-export type AunpOut = {
-  ordinal: number
-  size_nm: number | null
-  type: string | null
-  fluorophore: string | null
-  concentration_value: number | null
-  concentration_unit: string | null
-  conjugation: string | null
-  conjugation_target: string | null
-  notes: string | null
+export type MdRunOut = {
+  md_run_id: string
+  seed: number | null
+  computer: string | null
 }
 
-export type TomogramOut = {
+// Fields shared between raw and post-processed tomogram outputs.
+type TomogramOutBase = {
   tomogram_id: string
-  pipeline: string | null
-  software: string | null
-  voxel_bin: number | null
-  voxel_spacing_angstrom: number | null
-  voxel_spacing_angstrom_implied: number | null
+  voxel_size: number | null
   derived_from: string[]
-  is_raw: boolean | null
   image_size_x: number | null
   image_size_y: number | null
   image_size_z: number | null
@@ -84,6 +94,17 @@ export type TomogramOut = {
   zarr_path: string | null
   zarr_axes: string | null
   zarr_scale: number[] | null
+}
+
+export type RawTomogramOut = TomogramOutBase & {
+  pipeline: string | null
+  software: string | null
+}
+
+export type PostProcessedTomogramOut = TomogramOutBase & {
+  denoising_software: string | null
+  ctf_software: string | null
+  missing_wedge_software: string | null
   size_bytes: number | null
 }
 
@@ -110,15 +131,23 @@ export type TiltSeriesOut = {
   camera: string | null
 }
 
+export type MdSourceOut = {
+  md_run_id: string | null
+  frame: number | null
+}
+
 export type AcquisitionOut = {
   acquisition_id: string
   resolution: number | null
   microscope: string | null
+  quality: string | null
   pixel_size: number | null
   voltage: number | null
   camera: string | null
   path: string | null
-  tomograms: TomogramOut[]
+  md_source: MdSourceOut | null
+  raw_tomogram: RawTomogramOut | null
+  post_processed_tomograms: PostProcessedTomogramOut[]
   annotations: AnnotationOut[]
   tilt_series: TiltSeriesOut[]
 }
@@ -131,11 +160,12 @@ export type SampleDetail = {
   cell_type: string | null
   description: string | null
   chromatin: ChromatinOut | null
-  synapse: SynapseOut | null
+  fiducial: FiducialOut | null
   simulation: SimulationOut | null
   freezing: FreezingOut | null
   milling: MillingOut | null
-  aunp: AunpOut[]
+  label: LabelOut[]
+  md_run: MdRunOut[]
   acquisitions: AcquisitionOut[]
 }
 
@@ -155,7 +185,7 @@ export type FiltersOptionsOut = {
   cameras: string[]
   image_formats: string[]
   pixel_size: RangeOut
-  voxel_spacing: RangeOut
+  voxel_size: RangeOut
   n_tilts: RangeOut
 }
 
@@ -163,6 +193,7 @@ export type StatsTotalsOut = {
   samples: number
   acquisitions: number
   tilt_series: number
+  // Sum across raw + post-processed tomogram tables.
   tomograms: number
   annotations: number
   warnings: number
@@ -172,7 +203,10 @@ export type ProjectStatRow = {
   project: string
   samples: number
   acquisitions: number
+  // Sum across raw + post-processed tomogram tables.
   tomograms: number
+  // Sum across PostProcessedTomogramOut.size_bytes only — RawTomogram has
+  // no size_bytes field in the schema.
   size_bytes: number
 }
 
