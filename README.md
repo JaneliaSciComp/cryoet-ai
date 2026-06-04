@@ -32,10 +32,10 @@ For the schema itself, see `cryoet_schema/schema_info.md` (human reference) and 
 
 The frontend's Node deps are installed automatically the first time you run `pixi run frontend` (and re-run only when `package.json` / `package-lock.json` change). You don't need a separate `npm install` step.
 
-3. Create the database. This will scan the scratch reorganized data located at `/groups/cryoet/cryoet/data/scratch/data` and create a SQLite database called `cryoet_catalog.db` in your repo root.
+3. Create the database. Pass the path to the data root via the CATALOG_DATA_ROOT env variable. This will scan the samples at that path and create a SQLite database called `cryoet_catalog.db` in your repo root.
 
 ```
-pixi run scan --init
+CATALOG_DATA_ROOT=/path/to/data pixi run scan --init
 ```
 
 ---
