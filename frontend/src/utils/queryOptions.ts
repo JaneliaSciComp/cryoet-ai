@@ -114,6 +114,46 @@ export function useScansQuery() {
   return useSuspenseQuery(scansQueryOptions)
 }
 
+// ── /scans/{id} (+ /warnings, /samples) ──────────────────────────────────────
+
+// A specific scan run by id. Rejects with a 404 Error when the scan is
+// unknown, which the route loader turns into a `notFound()`.
+export const scanQueryOptions = (scanId: string) =>
+  queryOptions({
+    queryKey: ['scans', 'detail', scanId],
+    queryFn: () => apiFetch<ScanOut>(`/scans/${encodeURIComponent(scanId)}`),
+  })
+
+export function useScanQuery(scanId: string) {
+  return useSuspenseQuery(scanQueryOptions(scanId))
+}
+
+export const scanWarningsQueryOptions = (scanId: string) =>
+  queryOptions({
+    queryKey: ['scans', 'detail', scanId, 'warnings'],
+    queryFn: () =>
+      apiFetch<SampleWarningsGroup[]>(
+        `/scans/${encodeURIComponent(scanId)}/warnings`,
+      ),
+  })
+
+export function useScanWarningsQuery(scanId: string) {
+  return useSuspenseQuery(scanWarningsQueryOptions(scanId))
+}
+
+export const scanSamplesQueryOptions = (scanId: string, outcome: ScanOutcome) =>
+  queryOptions({
+    queryKey: ['scans', 'detail', scanId, 'samples', outcome],
+    queryFn: () =>
+      apiFetch<ScanSampleOut[]>(
+        `/scans/${encodeURIComponent(scanId)}/samples?outcome=${outcome}`,
+      ),
+  })
+
+export function useScanSamplesQuery(scanId: string, outcome: ScanOutcome) {
+  return useSuspenseQuery(scanSamplesQueryOptions(scanId, outcome))
+}
+
 // ── /scans/latest ────────────────────────────────────────────────────────────
 
 export const latestScanQueryOptions = queryOptions({

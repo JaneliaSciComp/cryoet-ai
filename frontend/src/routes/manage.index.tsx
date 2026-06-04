@@ -96,6 +96,15 @@ function ManageRoute() {
           <Typography variant="h6" component="h2">
             Last file system scan
           </Typography>
+          {latestScan ? (
+            <CustomLink
+              to="/manage/$scanId"
+              params={{ scanId: latestScan.scan_run_id }}
+              variant="body2"
+            >
+              View scan details
+            </CustomLink>
+          ) : null}
           <Link href="/manage/all-scans" variant="body2">
             View all scans
           </Link>
