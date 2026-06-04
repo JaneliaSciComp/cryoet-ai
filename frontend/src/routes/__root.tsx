@@ -15,6 +15,7 @@ import fontsourceVariableRobotoCss from '@fontsource-variable/roboto?url'
 import React from 'react'
 import { theme } from '~/styles/theme'
 import { Header } from '~/components/Header'
+import { Footer } from '~/components/Footer'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -59,6 +60,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Container component="main" sx={{ paddingBlock: 4 }}>
             {children}
           </Container>
+          <Footer />
         </Providers>
 
         <TanStackRouterDevtools position="bottom-right" />

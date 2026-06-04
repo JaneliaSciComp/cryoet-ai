@@ -162,19 +162,6 @@ function Home() {
           </Stack>
         </Grid>
       </Grid>
-
-      <Box
-        sx={{
-          bgcolor: 'primary.dark',
-          color: 'common.white',
-          borderRadius: 2,
-          px: { xs: 2, md: 4 },
-          py: 2,
-          textAlign: 'right',
-        }}
-      >
-        <Typography variant="body2">HHMI Janelia</Typography>
-      </Box>
     </Stack>
   )
 }
