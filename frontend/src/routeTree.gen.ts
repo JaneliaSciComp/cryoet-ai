@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ManageIndexRouteImport } from './routes/manage.index'
 import { Route as SamplesSampleIdRouteImport } from './routes/samples.$sampleId'
+import { Route as ManageAllScansRouteImport } from './routes/manage.all-scans'
 import { Route as AcquisitionsAcquisitionIdRouteImport } from './routes/acquisitions.$acquisitionId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const SamplesSampleIdRoute = SamplesSampleIdRouteImport.update({
   path: '/samples/$sampleId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ManageAllScansRoute = ManageAllScansRouteImport.update({
+  id: '/manage/all-scans',
+  path: '/manage/all-scans',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AcquisitionsAcquisitionIdRoute =
   AcquisitionsAcquisitionIdRouteImport.update({
     id: '/acquisitions/$acquisitionId',
@@ -39,12 +45,14 @@ const AcquisitionsAcquisitionIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/acquisitions/$acquisitionId': typeof AcquisitionsAcquisitionIdRoute
+  '/manage/all-scans': typeof ManageAllScansRoute
   '/samples/$sampleId': typeof SamplesSampleIdRoute
   '/manage/': typeof ManageIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/acquisitions/$acquisitionId': typeof AcquisitionsAcquisitionIdRoute
+  '/manage/all-scans': typeof ManageAllScansRoute
   '/samples/$sampleId': typeof SamplesSampleIdRoute
   '/manage': typeof ManageIndexRoute
 }
@@ -52,6 +60,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/acquisitions/$acquisitionId': typeof AcquisitionsAcquisitionIdRoute
+  '/manage/all-scans': typeof ManageAllScansRoute
   '/samples/$sampleId': typeof SamplesSampleIdRoute
   '/manage/': typeof ManageIndexRoute
 }
@@ -60,14 +69,21 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/acquisitions/$acquisitionId'
+    | '/manage/all-scans'
     | '/samples/$sampleId'
     | '/manage/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/acquisitions/$acquisitionId' | '/samples/$sampleId' | '/manage'
+  to:
+    | '/'
+    | '/acquisitions/$acquisitionId'
+    | '/manage/all-scans'
+    | '/samples/$sampleId'
+    | '/manage'
   id:
     | '__root__'
     | '/'
     | '/acquisitions/$acquisitionId'
+    | '/manage/all-scans'
     | '/samples/$sampleId'
     | '/manage/'
   fileRoutesById: FileRoutesById
@@ -75,6 +91,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcquisitionsAcquisitionIdRoute: typeof AcquisitionsAcquisitionIdRoute
+  ManageAllScansRoute: typeof ManageAllScansRoute
   SamplesSampleIdRoute: typeof SamplesSampleIdRoute
   ManageIndexRoute: typeof ManageIndexRoute
 }
@@ -102,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SamplesSampleIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/manage/all-scans': {
+      id: '/manage/all-scans'
+      path: '/manage/all-scans'
+      fullPath: '/manage/all-scans'
+      preLoaderRoute: typeof ManageAllScansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/acquisitions/$acquisitionId': {
       id: '/acquisitions/$acquisitionId'
       path: '/acquisitions/$acquisitionId'
@@ -115,6 +139,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcquisitionsAcquisitionIdRoute: AcquisitionsAcquisitionIdRoute,
+  ManageAllScansRoute: ManageAllScansRoute,
   SamplesSampleIdRoute: SamplesSampleIdRoute,
   ManageIndexRoute: ManageIndexRoute,
 }

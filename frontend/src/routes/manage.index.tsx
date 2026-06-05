@@ -96,9 +96,9 @@ function ManageRoute() {
           <Typography variant="h6" component="h2">
             Last file system scan
           </Typography>
-          <Link href="/manage/all-scans" variant="body2">
+          <CustomLink to="/manage/all-scans" variant="body2">
             View all scans
-          </Link>
+          </CustomLink>
         </Stack>
         <LastScanCard scan={latestScan} />
       </Box>
