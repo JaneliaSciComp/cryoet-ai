@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from cryoet_catalog.discovery import (
+    dir_size_bytes,
     iter_acquisitions,
     iter_annotations,
     iter_samples,
@@ -103,3 +106,68 @@ def test_parse_targets_for_sample_includes_all_categories():
     # deterministic, unique
     assert sorted(targets, key=lambda p: str(p)) == targets
     assert len(set(targets)) == len(targets)
+
+
+# ---------------------------------------------------------------------------
+# dir_size_bytes
+# ---------------------------------------------------------------------------
+
+
+def test_dir_size_bytes_empty_dir(tmp_path):
+    d = tmp_path / "empty"
+    d.mkdir()
+    assert dir_size_bytes(d) == 0
+
+
+def test_dir_size_bytes_flat_files(tmp_path):
+    d = tmp_path / "flat"
+    d.mkdir()
+    (d / "a.bin").write_bytes(b"hello")        # 5 bytes
+    (d / "b.bin").write_bytes(b"world!!")      # 7 bytes
+    assert dir_size_bytes(d) == 12
+
+
+def test_dir_size_bytes_nested_subdirs(tmp_path):
+    d = tmp_path / "nested"
+    d.mkdir()
+    (d / "top.txt").write_bytes(b"x" * 10)
+    sub = d / "sub"
+    sub.mkdir()
+    (sub / "mid.txt").write_bytes(b"y" * 20)
+    zarr = d / "volume.zarr"
+    zarr.mkdir()
+    chunk = zarr / "0"
+    chunk.mkdir()
+    (chunk / "0.0.0").write_bytes(b"z" * 100)
+    expected = 10 + 20 + 100
+    assert dir_size_bytes(d) == expected
+
+
+def test_dir_size_bytes_symlinks_not_followed(tmp_path):
+    # Large file lives outside the measured directory.
+    large = tmp_path / "large.bin"
+    large.write_bytes(b"L" * 4096)
+
+    d = tmp_path / "measured"
+    d.mkdir()
+    regular = d / "small.txt"
+    regular.write_bytes(b"S" * 8)
+
+    # Symlink pointing to the large file — must NOT add 4096.
+    link = d / "link_to_large"
+    link.symlink_to(large)
+
+    # Broken symlink — must not raise.
+    broken = d / "broken_link"
+    broken.symlink_to(tmp_path / "nonexistent_target")
+
+    result = dir_size_bytes(d)
+    # Must not raise and must not count the target's 4096 bytes.
+    assert result != pytest.approx(8 + 4096)
+    # The regular file's bytes are counted; symlink metadata size is small.
+    assert 8 <= result < 8 + 4096
+
+
+def test_dir_size_bytes_nonexistent_path():
+    result = dir_size_bytes(Path("/nonexistent/path/xyz_no_such_dir"))
+    assert result == 0

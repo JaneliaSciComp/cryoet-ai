@@ -43,7 +43,7 @@ from cryoet_schema.schema import (
 # pydantic_only_pk_fields: fields that are Optional[T] in Pydantic but NOT NULL
 # in DB because they're path-injected.
 MAPPING = [
-    (Sample, orm.SampleORM, {"deleted_at"}, {"sample_id"}),
+    (Sample, orm.SampleORM, {"deleted_at", "disk_size_bytes"}, {"sample_id"}),
     (Chromatin, orm.ChromatinORM, {"sample_id"}, set()),
     (Label, orm.LabelORM, {"sample_id", "ordinal"}, set()),
     (Fiducial, orm.FiducialORM, {"sample_id"}, set()),

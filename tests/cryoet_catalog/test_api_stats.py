@@ -42,9 +42,11 @@ def seeded_client(tmp_path):
     try:
         # ── chromatin: two live samples ────────────────────────────────
         # chrom_a: 2 acq × (2 tomos + 1 tilt_series + 1 annotation)
+        # disk_size_bytes=6000 → chromatin total will be 6000 (chrom_b is NULL/0)
         s.add(orm.SampleORM(
             sample_id="chrom_a", data_source=DataSource.experimental,
             project=Project.chromatin,
+            disk_size_bytes=6000,
         ))
         for acq_id in ("acq1", "acq2"):
             s.add(orm.AcquisitionORM(
@@ -66,9 +68,11 @@ def seeded_client(tmp_path):
             ))
 
         # chrom_b: 1 acq × (1 tomo with NULL size_bytes + 0 tilt_series + 0 annotations)
+        # disk_size_bytes=None → must coalesce to 0 in by_project size_bytes
         s.add(orm.SampleORM(
             sample_id="chrom_b", data_source=DataSource.experimental,
             project=Project.chromatin,
+            disk_size_bytes=None,
         ))
         s.add(orm.AcquisitionORM(
             sample_id="chrom_b", acquisition_id="acq1",
@@ -80,9 +84,11 @@ def seeded_client(tmp_path):
 
         # ── synapse: two live samples ──────────────────────────────────
         # syn_a: 1 acq × (1 tomo + 2 tilt_series + 1 annotation)
+        # disk_size_bytes=5000 → synapse total will be 5000 (syn_b is NULL/0)
         s.add(orm.SampleORM(
             sample_id="syn_a", data_source=DataSource.simulation,
             project=Project.synapse,
+            disk_size_bytes=5000,
         ))
         s.add(orm.AcquisitionORM(
             sample_id="syn_a", acquisition_id="acq1",
@@ -100,19 +106,23 @@ def seeded_client(tmp_path):
         ))
 
         # syn_b: 1 acq, no tomograms / tilt_series / annotations
+        # disk_size_bytes=None → contributes 0 to synapse size total
         s.add(orm.SampleORM(
             sample_id="syn_b", data_source=DataSource.simulation,
             project=Project.synapse,
+            disk_size_bytes=None,
         ))
         s.add(orm.AcquisitionORM(
             sample_id="syn_b", acquisition_id="acq1",
         ))
 
         # ── soft-deleted sample whose rows must NOT contribute ─────────
+        # disk_size_bytes=99999 → must NOT contribute to chromatin size_bytes
         s.add(orm.SampleORM(
             sample_id="dead", data_source=DataSource.experimental,
             project=Project.chromatin,
             deleted_at=time.time(),
+            disk_size_bytes=99999,
         ))
         s.add(orm.AcquisitionORM(
             sample_id="dead", acquisition_id="acq1",
@@ -223,8 +233,8 @@ def test_by_project_rows_match_seeded_counts(seeded_client):
     assert chrom["samples"] == 2
     assert chrom["acquisitions"] == 3
     assert chrom["tomograms"] == 5
-    # size_bytes: 2 × (1000+2000) from chrom_a, + 0 (NULL) from chrom_b,
-    # + 0 from soft-deleted "dead" → 6000.
+    # size_bytes: SampleORM.disk_size_bytes — chrom_a=6000, chrom_b=NULL(→0),
+    # soft-deleted "dead" excluded → 6000.
     assert chrom["size_bytes"] == 6000
 
     syn = next(row for row in rows if row["project"] == "synapse")
@@ -236,7 +246,7 @@ def test_by_project_rows_match_seeded_counts(seeded_client):
 
 
 def test_soft_deleted_excluded_from_by_project(seeded_client):
-    """The soft-deleted sample's 99999-byte tomogram must not leak into the
+    """The soft-deleted sample's disk_size_bytes=99999 must not leak into the
     chromatin size_bytes total."""
     r = seeded_client.get("/stats/overview")
     chrom = next(
@@ -246,8 +256,8 @@ def test_soft_deleted_excluded_from_by_project(seeded_client):
 
 
 def test_null_size_bytes_contributes_zero(seeded_client):
-    """``chrom_b``'s only tomogram has NULL ``size_bytes``; the project total
-    must include it as 0, not None / not error."""
+    """``chrom_b`` has NULL ``disk_size_bytes``; the project total must include
+    it as 0, not None / not error."""
     r = seeded_client.get("/stats/overview")
     chrom = next(
         row for row in r.json()["by_project"] if row["project"] == "chromatin"

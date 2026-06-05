@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
-from cryoet_catalog import db, orm, scanner
+from cryoet_catalog import db, discovery, orm, scanner
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -281,5 +281,85 @@ def test_failed_scan_marks_status_failed(engine, tmp_path):
         )
         # Most recent scan should be 'failed'
         assert scans[0].status == "failed"
+    finally:
+        s.close()
+
+
+def test_scan_populates_disk_size_bytes(engine, tmp_path):
+    sample_dir = _write_minimal_sample(tmp_path, "sample_a")
+    # Add a file with a known size so dir_size_bytes returns something non-zero.
+    (sample_dir / "data.bin").write_bytes(b"x" * 1024)
+
+    scanner.scan_root(engine, tmp_path)
+
+    s = _session(engine)
+    try:
+        row = s.get(orm.SampleORM, "sample_a")
+        assert row is not None
+        assert row.disk_size_bytes is not None
+        assert row.disk_size_bytes == discovery.dir_size_bytes(sample_dir)
+    finally:
+        s.close()
+
+
+def test_skip_preserves_disk_size_bytes(engine, tmp_path):
+    sample_dir = _write_minimal_sample(tmp_path, "sample_a")
+    (sample_dir / "data.bin").write_bytes(b"x" * 1024)
+
+    # First scan: populates disk_size_bytes.
+    scanner.scan_root(engine, tmp_path)
+
+    s = _session(engine)
+    try:
+        row = s.get(orm.SampleORM, "sample_a")
+        assert row is not None
+        original_size = row.disk_size_bytes
+        assert original_size is not None
+    finally:
+        s.close()
+
+    # Second scan: nothing changed on disk, so the mtime gate skips the sample.
+    report2 = scanner.scan_root(engine, tmp_path)
+    assert report2.skipped >= 1
+
+    s = _session(engine)
+    try:
+        row = s.get(orm.SampleORM, "sample_a")
+        assert row is not None
+        assert row.disk_size_bytes == original_size
+    finally:
+        s.close()
+
+
+def test_force_recomputes_disk_size_bytes(engine, tmp_path):
+    sample_dir = _write_minimal_sample(tmp_path, "sample_a")
+    (sample_dir / "data.bin").write_bytes(b"x" * 1024)
+
+    # First scan.
+    scanner.scan_root(engine, tmp_path)
+
+    s = _session(engine)
+    try:
+        row = s.get(orm.SampleORM, "sample_a")
+        assert row is not None
+        first_size = row.disk_size_bytes
+        assert first_size is not None
+    finally:
+        s.close()
+
+    # Add a new file to increase the on-disk size.
+    extra_file = sample_dir / "extra.bin"
+    extra_file.write_bytes(b"y" * 512)
+    extra_bytes = extra_file.stat().st_size
+
+    # Re-scan with force=True so it re-assembles and recomputes size.
+    scanner.scan_root(engine, tmp_path, force=True)
+
+    s = _session(engine)
+    try:
+        row = s.get(orm.SampleORM, "sample_a")
+        assert row is not None
+        assert row.disk_size_bytes is not None
+        assert row.disk_size_bytes >= first_size + extra_bytes
     finally:
         s.close()

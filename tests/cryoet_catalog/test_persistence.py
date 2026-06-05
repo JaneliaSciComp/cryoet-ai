@@ -589,6 +589,28 @@ def test_unflushed_inserts_dont_get_deleted_by_stale_cleanup(session):
     ) is not None
 
 
+def test_upsert_writes_disk_size_bytes(session):
+    r = _make_record()
+    upsert_sample_record(
+        session, r, extras=[], warnings=[], scan_run_id="run-1", disk_size_bytes=12345
+    )
+    session.commit()
+    row = session.get(orm.SampleORM, "s1")
+    assert row is not None
+    assert row.disk_size_bytes == 12345
+
+
+def test_upsert_default_disk_size_bytes_is_null(session):
+    r = _make_record()
+    upsert_sample_record(
+        session, r, extras=[], warnings=[], scan_run_id="run-1"
+    )
+    session.commit()
+    row = session.get(orm.SampleORM, "s1")
+    assert row is not None
+    assert row.disk_size_bytes is None
+
+
 def test_per_sample_isolation_scan_warnings_only_for_target_sample(session):
     """Warnings refresh deletes only this sample's rows, not all."""
     r1 = _make_record(sample_id="s1")
