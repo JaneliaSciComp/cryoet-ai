@@ -346,6 +346,7 @@ class SampleRecord(_Base):
     """
 
     sample: Sample
+    lab_name: LabName | None = None
     simulation: Simulation | None = None
     chromatin: Chromatin | None = None
     label: list[Label] = Field(default_factory=list)
