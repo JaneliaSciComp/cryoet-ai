@@ -46,7 +46,7 @@ The portal has two processes: the FastAPI backend (reads the catalog DB) and the
 
 **Terminal 1 — API:**
 ```
-pixi run api
+CATALOG_DATA_ROOT=/path/to/data pixi run api
 ```
 Serves `http://localhost:8000` with auto-reload. Swagger UI at `/docs`.
 
