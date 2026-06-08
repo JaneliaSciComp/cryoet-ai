@@ -148,7 +148,19 @@ function SampleDetailRoute() {
             const src = firstWithRep && repId
               ? tomogramThumbnailUrl(sample.sample_id, firstWithRep.acquisition_id, repId)
               : null
-            return <PreviewThumbnail src={src} width="100%" height={220} />
+            return (
+              <Box>
+                <PreviewThumbnail
+                  src={src}
+                  alt={`Center XY slice of the representative tomogram for ${sample.sample_id}`}
+                  width="100%"
+                  height={220}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+                  Center XY slice rendered from the representative tomogram MRC file
+                </Typography>
+              </Box>
+            )
           })()}
         </Grid>
 

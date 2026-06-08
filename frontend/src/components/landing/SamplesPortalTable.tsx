@@ -5,6 +5,7 @@ import {
   type MRT_ColumnDef,
 } from 'material-react-table'
 import type { SampleSummary } from '~/types'
+import { Tooltip } from '@mui/material'
 import { CustomLink } from '~/components/CustomLink'
 import { PreviewThumbnail, thumbnailUrl } from '~/components/common/Thumbnail'
 import { AcquisitionsSubTable } from './AcquisitionsSubTable'
@@ -24,9 +25,16 @@ export function SamplesPortalTable(props: {
         header: '',
         columnDefType: 'display',
         size: 80,
-        Cell: ({ row }) => (
-          <PreviewThumbnail src={thumbnailUrl(row.original.thumbnail_path)} />
-        ),
+        Cell: ({ row }) => {
+          const alt = `Center XY slice of the representative tomogram for ${row.original.sample_id}`
+          return (
+            <Tooltip title={alt}>
+              <span>
+                <PreviewThumbnail src={thumbnailUrl(row.original.thumbnail_path)} alt={alt} />
+              </span>
+            </Tooltip>
+          )
+        },
       },
       {
         accessorKey: 'sample_id',
