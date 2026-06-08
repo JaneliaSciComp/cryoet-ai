@@ -19,7 +19,6 @@ import type {
   PostProcessedTomogramOut,
   RawTomogramOut,
 } from '~/types'
-import { Tooltip } from '@mui/material'
 import { PreviewThumbnail, ThumbnailPlaceholder, tomogramThumbnailUrl } from '~/components/common/Thumbnail'
 import { NeuroglancerButton } from '~/components/common/NeuroglancerButton'
 
@@ -151,21 +150,18 @@ export function TomogramsAnnotationsTable(props: {
         Cell: ({ row }) => {
           const alt = `Center XY slice of ${row.original.tomogram_id}`
           return (
-            <Tooltip title={alt}>
-              <span>
-                <PreviewThumbnail
-                  src={tomogramThumbnailUrl(
-                    sampleId,
-                    acquisition.acquisition_id,
-                    row.original.tomogram_id,
-                  )}
-                  alt={alt}
-                  width={96}
-                  height={64}
-                  clickable
-                />
-              </span>
-            </Tooltip>
+            <PreviewThumbnail
+              src={tomogramThumbnailUrl(
+                sampleId,
+                acquisition.acquisition_id,
+                row.original.tomogram_id,
+              )}
+              alt={alt}
+              tooltipTitle={alt}
+              width={96}
+              height={64}
+              clickable
+            />
           )
         },
       },

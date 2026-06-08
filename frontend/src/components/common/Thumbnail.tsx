@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Box, Modal, Typography } from '@mui/material'
+import { Box, Modal, Tooltip, Typography } from '@mui/material'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import type { AcquisitionOut } from '~/types'
 
@@ -83,14 +83,16 @@ function ThumbnailLightbox(props: {
 // the request fails (e.g. the preview endpoint returns 422 for EER-only tilt
 // series). Keeps the same footprint either way so table rows don't jump.
 // Pass `clickable` to let users open a full-screen lightbox on click.
+// Pass `tooltipTitle` to show a tooltip that auto-dismisses when the lightbox opens.
 export function PreviewThumbnail(props: {
   src?: string | null
   alt?: string
   width?: Size
   height?: Size
   clickable?: boolean
+  tooltipTitle?: string
 }) {
-  const { src, alt = '', width = 56, height = 40, clickable = false } = props
+  const { src, alt = '', width = 56, height = 40, clickable = false, tooltipTitle } = props
   const [failed, setFailed] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
@@ -98,24 +100,34 @@ export function PreviewThumbnail(props: {
     return <ThumbnailPlaceholder width={width} height={height} />
   }
 
+  const img = (
+    <Box
+      component="img"
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      onClick={clickable ? () => setLightboxOpen(true) : undefined}
+      sx={{
+        width,
+        height,
+        objectFit: 'cover',
+        borderRadius: 1,
+        display: 'block',
+        bgcolor: 'action.hover',
+        ...(clickable && { cursor: 'pointer' }),
+      }}
+    />
+  )
+
   return (
     <>
-      <Box
-        component="img"
-        src={src}
-        alt={alt}
-        onError={() => setFailed(true)}
-        onClick={clickable ? () => setLightboxOpen(true) : undefined}
-        sx={{
-          width,
-          height,
-          objectFit: 'cover',
-          borderRadius: 1,
-          display: 'block',
-          bgcolor: 'action.hover',
-          ...(clickable && { cursor: 'pointer' }),
-        }}
-      />
+      {tooltipTitle ? (
+        <Tooltip title={tooltipTitle} open={lightboxOpen ? false : undefined}>
+          <span>{img}</span>
+        </Tooltip>
+      ) : (
+        img
+      )}
       {clickable && lightboxOpen && (
         <ThumbnailLightbox
           open={lightboxOpen}

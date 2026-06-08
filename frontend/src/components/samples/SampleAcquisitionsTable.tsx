@@ -4,7 +4,6 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from 'material-react-table'
-import { Tooltip } from '@mui/material'
 import type { AcquisitionOut } from '~/types'
 import { CustomLink } from '~/components/CustomLink'
 import { PreviewThumbnail, tomogramThumbnailUrl, acquisitionRepTomogramId } from '~/components/common/Thumbnail'
@@ -36,17 +35,14 @@ export function SampleAcquisitionsTable(props: {
         Cell: ({ row }) => {
           const alt = `Center XY slice of the representative tomogram for ${row.original.acquisition_id}`
           return (
-            <Tooltip title={alt}>
-              <span>
-                <PreviewThumbnail
-                  src={acquisitionPreviewSrc(sampleId, row.original)}
-                  alt={alt}
-                  width={96}
-                  height={64}
-                  clickable
-                />
-              </span>
-            </Tooltip>
+            <PreviewThumbnail
+              src={acquisitionPreviewSrc(sampleId, row.original)}
+              alt={alt}
+              tooltipTitle={alt}
+              width={96}
+              height={64}
+              clickable
+            />
           )
         },
       },
