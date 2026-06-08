@@ -6,26 +6,16 @@ import {
 } from 'material-react-table'
 import type { AcquisitionOut } from '~/types'
 import { CustomLink } from '~/components/CustomLink'
-import { PreviewThumbnail } from '~/components/common/Thumbnail'
+import { PreviewThumbnail, tomogramThumbnailUrl, acquisitionRepTomogramId } from '~/components/common/Thumbnail'
 
 // Mirrors the API's `n_tomograms` semantics: raw + post-processed combined.
 function tomogramCount(a: AcquisitionOut): number {
   return (a.raw_tomogram ? 1 : 0) + a.post_processed_tomograms.length
 }
 
-// Center-tilt preview for the acquisition's first tilt series, served by the
-// `/tilt-series/.../preview.png` endpoint (proxied under `/api` in the
-// browser). Falls back to a placeholder when there's no tilt series or the
-// endpoint can't render one.
-function acquisitionPreviewSrc(
-  sampleId: string,
-  a: AcquisitionOut,
-): string | null {
-  const ts = a.tilt_series[0]
-  if (!ts) return null
-  return `/api/tilt-series/${encodeURIComponent(sampleId)}/${encodeURIComponent(
-    a.acquisition_id,
-  )}/${encodeURIComponent(ts.tilt_series_id)}/preview.png`
+function acquisitionPreviewSrc(sampleId: string, a: AcquisitionOut): string | null {
+  const repId = acquisitionRepTomogramId(a)
+  return repId ? tomogramThumbnailUrl(sampleId, a.acquisition_id, repId) : null
 }
 
 export function SampleAcquisitionsTable(props: {

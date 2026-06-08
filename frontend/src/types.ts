@@ -16,6 +16,7 @@ export type SampleSummary = {
   n_acquisitions: number
   n_tomograms: number
   n_tilt_series: number
+  thumbnail_path: string | null
 }
 
 // ── Sample detail: typed sub-entities ────────────────────────────────────

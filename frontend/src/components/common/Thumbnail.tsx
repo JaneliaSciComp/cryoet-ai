@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Box, Typography } from '@mui/material'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import type { AcquisitionOut } from '~/types'
 
 type Size = number | string
 
@@ -73,4 +74,23 @@ export function PreviewThumbnail(props: {
       }}
     />
   )
+}
+
+// ── Thumbnail URL helpers ────────────────────────────────────────────────
+
+// Relpath scheme must match cryoet_catalog/thumbnails._relpath.
+export function tomogramThumbnailUrl(s: string, a: string, t: string): string {
+  const enc = (x: string) => x.split('/').map(encodeURIComponent).join('/')
+  return `/api/thumbnails/${enc(s)}/${enc(a)}/${enc(t)}.png`
+}
+
+export function thumbnailUrl(relpath?: string | null): string | null {
+  return relpath
+    ? `/api/thumbnails/${relpath.split('/').map(encodeURIComponent).join('/')}`
+    : null
+}
+
+// Acquisition representative: post[0] then raw, by tomogram_id sort.
+export function acquisitionRepTomogramId(a: AcquisitionOut): string | null {
+  return a.post_processed_tomograms[0]?.tomogram_id ?? a.raw_tomogram?.tomogram_id ?? null
 }

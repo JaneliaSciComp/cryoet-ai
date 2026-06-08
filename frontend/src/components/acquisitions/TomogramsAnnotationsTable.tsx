@@ -19,7 +19,7 @@ import type {
   PostProcessedTomogramOut,
   RawTomogramOut,
 } from '~/types'
-import { PreviewThumbnail, ThumbnailPlaceholder } from '~/components/common/Thumbnail'
+import { PreviewThumbnail, ThumbnailPlaceholder, tomogramThumbnailUrl } from '~/components/common/Thumbnail'
 import { NeuroglancerButton } from '~/components/common/NeuroglancerButton'
 
 // Discriminated row so raw vs. post-processed tomograms share one table while
@@ -51,15 +51,6 @@ function formatBytes(n: number | null | undefined) {
   return `${i === 0 ? value : value.toFixed(1)} ${units[i]}`
 }
 
-function tomogramPreviewSrc(
-  sampleId: string,
-  acquisitionId: string,
-  tomogramId: string,
-): string {
-  return `/api/tomograms/${encodeURIComponent(sampleId)}/${encodeURIComponent(
-    acquisitionId,
-  )}/${encodeURIComponent(tomogramId)}/preview.png`
-}
 
 function combinedTomograms(acquisition: AcquisitionOut): TomogramRow[] {
   const rows: TomogramRow[] = []
@@ -158,7 +149,7 @@ export function TomogramsAnnotationsTable(props: {
         size: 140,
         Cell: ({ row }) => (
           <PreviewThumbnail
-            src={tomogramPreviewSrc(
+            src={tomogramThumbnailUrl(
               sampleId,
               acquisition.acquisition_id,
               row.original.tomogram_id,

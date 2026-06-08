@@ -11,7 +11,7 @@ import {
 } from '@mui/material'
 import type { SampleDetail } from '~/types'
 import { CustomLink } from '~/components/CustomLink'
-import { ThumbnailPlaceholder } from '~/components/common/Thumbnail'
+import { PreviewThumbnail, tomogramThumbnailUrl, acquisitionRepTomogramId } from '~/components/common/Thumbnail'
 import { FileglancerPathSection } from '~/components/common/FileglancerPathSection'
 import { SampleAcquisitionsTable } from '~/components/samples/SampleAcquisitionsTable'
 import {
@@ -137,7 +137,19 @@ function SampleDetailRoute() {
       {/* ── Details summary ────────────────────────────────────────── */}
       <Grid container spacing={4}>
         <Grid item xs={12} md={4}>
-          <ThumbnailPlaceholder width="100%" height={220} />
+          {(() => {
+            const sorted = [...sample.acquisitions].sort((a, b) =>
+              a.acquisition_id.localeCompare(b.acquisition_id),
+            )
+            const firstWithRep = sorted.find(
+              (a) => acquisitionRepTomogramId(a) !== null,
+            )
+            const repId = firstWithRep ? acquisitionRepTomogramId(firstWithRep) : null
+            const src = firstWithRep && repId
+              ? tomogramThumbnailUrl(sample.sample_id, firstWithRep.acquisition_id, repId)
+              : null
+            return <PreviewThumbnail src={src} width="100%" height={220} />
+          })()}
         </Grid>
 
         <Grid item xs={12} md={8}>

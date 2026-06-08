@@ -6,7 +6,7 @@ import {
 } from 'material-react-table'
 import type { SampleSummary } from '~/types'
 import { CustomLink } from '~/components/CustomLink'
-import { ThumbnailPlaceholder } from '~/components/common/Thumbnail'
+import { PreviewThumbnail, thumbnailUrl } from '~/components/common/Thumbnail'
 import { AcquisitionsSubTable } from './AcquisitionsSubTable'
 
 const dash = (v: unknown) => (v == null || v === '' ? '—' : String(v))
@@ -24,7 +24,9 @@ export function SamplesPortalTable(props: {
         header: '',
         columnDefType: 'display',
         size: 80,
-        Cell: () => <ThumbnailPlaceholder />,
+        Cell: ({ row }) => (
+          <PreviewThumbnail src={thumbnailUrl(row.original.thumbnail_path)} />
+        ),
       },
       {
         accessorKey: 'sample_id',
