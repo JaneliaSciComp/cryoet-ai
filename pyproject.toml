@@ -62,6 +62,8 @@ test = "pytest"
 sqlalchemy = ">=2.0"
 mrcfile = ">=1.5"
 alembic = ">=1.13"
+numpy = ">=1.26"
+matplotlib-base = ">=3.8"
 
 [tool.pixi.feature.catalog.tasks]
 migrate = "alembic -c cryoet_catalog/migrations/alembic.ini upgrade head"

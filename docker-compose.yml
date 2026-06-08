@@ -17,9 +17,11 @@ services:
       - CATALOG_DATA_ROOT=${CATALOG_DATA_ROOT:?set CATALOG_DATA_ROOT in .env}
       - CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      - CATALOG_THUMBNAIL_DIR=/thumbnails
     volumes:
       - ${CATALOG_DATA_ROOT}:${CATALOG_DATA_ROOT}:ro
       - catalog-db:/db
+      - thumbnails:/thumbnails:ro
     restart: unless-stopped
 
   frontend:
@@ -55,9 +57,12 @@ services:
     environment:
       - CATALOG_DATA_ROOT=${CATALOG_DATA_ROOT:?set CATALOG_DATA_ROOT in .env}
       - CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db
+      - CATALOG_THUMBNAIL_DIR=/thumbnails
     volumes:
       - ${CATALOG_DATA_ROOT}:${CATALOG_DATA_ROOT}:ro
       - catalog-db:/db
+      - thumbnails:/thumbnails
 
 volumes:
   catalog-db: {}
+  thumbnails: {}
