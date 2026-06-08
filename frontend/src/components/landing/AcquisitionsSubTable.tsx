@@ -8,6 +8,7 @@ import {
 } from 'material-react-table'
 import { sampleDetailQueryOptions } from '~/utils/queryOptions'
 import type { AcquisitionOut } from '~/types'
+import { CustomLink } from '~/components/CustomLink'
 
 const dash = (v: unknown) => (v == null || v === '' ? '—' : String(v))
 
@@ -18,7 +19,19 @@ export function AcquisitionsSubTable({ sampleId }: { sampleId: string }) {
 
   const columns = useMemo<MRT_ColumnDef<AcquisitionOut>[]>(
     () => [
-      { accessorKey: 'acquisition_id', header: 'Acquisition' },
+      {
+        accessorKey: 'acquisition_id',
+        header: 'Acquisition',
+        Cell: ({ cell }) => (
+          <CustomLink
+            to="/acquisitions/$acquisitionId"
+            params={{ acquisitionId: cell.getValue<string>() }}
+            search={{ sampleId }}
+          >
+            {cell.getValue<string>()}
+          </CustomLink>
+        ),
+      },
       {
         accessorKey: 'microscope',
         header: 'Microscope',
