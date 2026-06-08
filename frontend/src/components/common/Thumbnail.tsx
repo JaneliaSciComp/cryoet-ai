@@ -91,9 +91,11 @@ export function PreviewThumbnail(props: {
   height?: Size
   clickable?: boolean
   tooltipTitle?: string
+  objectFit?: 'cover' | 'contain'
 }) {
-  const { src, alt = '', width = 56, height = 40, clickable = false, tooltipTitle } = props
+  const { src, alt = '', width = 56, height = 40, clickable = false, tooltipTitle, objectFit = 'cover' } = props
   const [failed, setFailed] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
   if (!src || failed) {
@@ -106,14 +108,17 @@ export function PreviewThumbnail(props: {
       src={src}
       alt={alt}
       onError={() => setFailed(true)}
+      onLoad={() => setLoaded(true)}
       onClick={clickable ? () => setLightboxOpen(true) : undefined}
       sx={{
         width,
         height,
-        objectFit: 'cover',
+        objectFit,
         borderRadius: 1,
         display: 'block',
-        bgcolor: 'action.hover',
+        ...(loaded
+          ? { boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }
+          : { bgcolor: 'action.hover' }),
         ...(clickable && { cursor: 'pointer' }),
       }}
     />
