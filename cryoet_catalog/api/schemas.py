@@ -28,6 +28,7 @@ class SampleSummary(BaseModel):
     n_acquisitions: int = 0
     n_tomograms: int = 0
     n_tilt_series: int = 0
+    thumbnail_path: str | None = None
 
 
 # ── Sample detail: typed sub-entities ────────────────────────────────────

@@ -60,6 +60,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "(default 0.5)"
         ),
     )
+    scan.add_argument(
+        "--thumbnail-dir",
+        default=os.environ.get("CATALOG_THUMBNAIL_DIR"),
+        help="directory for pre-generated thumbnail cache (defaults to $CATALOG_THUMBNAIL_DIR)",
+    )
     return p
 
 
@@ -92,6 +97,11 @@ def _cmd_scan(args) -> int:
     if args.init:
         db.init_schema(engine)
 
+    thumbnail_dir = None
+    if args.thumbnail_dir:
+        thumbnail_dir = Path(args.thumbnail_dir)
+        thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
     try:
         report = scanner.scan_root(
             engine,
@@ -100,6 +110,7 @@ def _cmd_scan(args) -> int:
             prune=args.prune,
             prune_dry_run=args.prune_dry_run,
             prune_safety_floor=args.prune_safety_floor,
+            thumbnail_dir=thumbnail_dir,
         )
     except Exception as e:  # noqa: BLE001
         print(f"scan failed: {e}", file=sys.stderr)
@@ -107,6 +118,8 @@ def _cmd_scan(args) -> int:
 
     print(f"upserted: {report.upserted}")
     print(f"skipped:  {report.skipped}")
+    if report.thumbnails_healed:
+        print(f"thumbnails_healed: {report.thumbnails_healed}")
     print(f"warnings: {len(report.warnings)}")
     print(f"errors:   {len(report.errors)}")
     if report.conflicts:

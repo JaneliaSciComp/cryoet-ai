@@ -54,6 +54,7 @@ class SampleORM(Base):
     deleted_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     # DB-only: true on-disk directory size cached by the scanner
     disk_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    thumbnail_path: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ChromatinORM(Base):

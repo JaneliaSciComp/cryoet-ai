@@ -131,6 +131,7 @@ def upsert_sample_record(
     warnings: list[ScanWarning],
     scan_run_id: str,
     disk_size_bytes: int | None = None,
+    thumbnail_path: str | None = None,
 ) -> None:
     """Per-sample upsert. Steps:
 
@@ -162,6 +163,7 @@ def upsert_sample_record(
     # filesystem reappearing must clear the tombstone.
     sample_payload["deleted_at"] = None
     sample_payload["disk_size_bytes"] = disk_size_bytes
+    sample_payload["thumbnail_path"] = thumbnail_path
     session.merge(
         orm.SampleORM(**_filter_to_columns(sample_payload, orm.SampleORM))
     )

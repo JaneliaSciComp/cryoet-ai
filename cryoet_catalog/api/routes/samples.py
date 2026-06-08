@@ -321,6 +321,7 @@ def list_samples(
             n_acquisitions=r[2],
             n_tomograms=r[3],
             n_tilt_series=r[4],
+            thumbnail_path=r[0].thumbnail_path,
         )
         for r in rows
     ]

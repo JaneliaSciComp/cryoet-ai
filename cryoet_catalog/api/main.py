@@ -6,6 +6,8 @@ Configuration via environment:
   CORS_ORIGINS               — comma-separated allowed origins (default: http://localhost:5173)
   CATALOG_DATA_ROOT          — filesystem root that bounds all preview/Neuroglancer reads.
                                Required at startup; the API refuses to start without it.
+  CATALOG_THUMBNAIL_DIR      — directory containing pre-generated thumbnail PNGs.
+                               Required at startup; the API refuses to start without it.
   NEUROGLANCER_MAX_VIEWERS   — bounded LRU size for active viewers (default 8).
 """
 from __future__ import annotations
@@ -37,6 +39,7 @@ from cryoet_catalog.api.routes import (
     samples,
     scans,
     stats,
+    thumbnails as thumbnails_routes,
     tilt_series as tilt_series_routes,
     tomograms,
     warnings as warnings_routes,
@@ -139,6 +142,27 @@ async def _lifespan(app: FastAPI):
             raise RuntimeError(f"CATALOG_DATA_ROOT={raw_root!r} is not a directory")
         app.state.data_root_resolved = resolved
 
+    # CATALOG_THUMBNAIL_DIR is required. Tests may pre-seed app.state.thumbnail_root
+    # (even to None) to bypass this; use hasattr so an explicit None is respected.
+    pre_seeded_thumb = hasattr(app.state, "thumbnail_root")
+    if not pre_seeded_thumb:
+        raw_thumb = os.environ.get("CATALOG_THUMBNAIL_DIR")
+        if not raw_thumb:
+            raise RuntimeError(
+                "CATALOG_THUMBNAIL_DIR is required (directory containing pre-generated "
+                "thumbnail PNGs). Generate thumbnails with: "
+                "CATALOG_DATA_ROOT=... CATALOG_THUMBNAIL_DIR=... pixi run scan --init"
+            )
+        try:
+            resolved_thumb = Path(raw_thumb).resolve(strict=True)
+        except (FileNotFoundError, OSError) as exc:
+            raise RuntimeError(
+                f"CATALOG_THUMBNAIL_DIR={raw_thumb!r} does not exist or is unreadable"
+            ) from exc
+        if not resolved_thumb.is_dir():
+            raise RuntimeError(f"CATALOG_THUMBNAIL_DIR={raw_thumb!r} is not a directory")
+        app.state.thumbnail_root = resolved_thumb
+
     workers = _detect_multi_worker()
     if workers is not None:
         logger.warning(
@@ -186,6 +210,7 @@ def create_app() -> FastAPI:
     app.include_router(
         tilt_series_routes.router, prefix="/tilt-series", tags=["tilt-series"]
     )
+    app.include_router(thumbnails_routes.router, prefix="/thumbnails", tags=["thumbnails"])
     return app
 
 

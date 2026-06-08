@@ -19,7 +19,7 @@ from uuid import uuid4
 from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
 
-from cryoet_catalog import assembler, discovery, persistence, state
+from cryoet_catalog import assembler, discovery, orm, persistence, state, thumbnails
 from cryoet_catalog.assembler import FieldConflict, ScanWarning
 
 
@@ -39,6 +39,7 @@ class ScanReport:
     skipped_ids: list[str] = field(default_factory=list)
     # (sample_id, error message) — sample-level failures only.
     failed_samples: list[tuple[str, str]] = field(default_factory=list)
+    thumbnails_healed: int = 0
 
 
 def scan_root(
@@ -50,6 +51,7 @@ def scan_root(
     prune_dry_run: bool = False,
     prune_safety_floor: float = 0.5,
     on_error: Literal["collect", "raise"] = "collect",
+    thumbnail_dir: Path | None = None,
 ) -> ScanReport:
     """Walk ``root``, assemble + persist each sample, return a ScanReport.
 
@@ -93,6 +95,7 @@ def scan_root(
                     soft_deleted_ids=soft_deleted_ids,
                     scan_run_id=scan_run_id,
                     report=report,
+                    thumbnail_dir=thumbnail_dir,
                 )
             except Exception as e:  # noqa: BLE001
                 # Make sure no partial transaction is left dangling.
@@ -152,6 +155,7 @@ def _scan_one_sample(
     soft_deleted_ids: set[str],
     scan_run_id: str,
     report: ScanReport,
+    thumbnail_dir: Path | None,
 ) -> None:
     """Per-sample scan inside its own transaction. Mutates ``report`` in place."""
     parse_targets = discovery.parse_targets_for_sample(sample_loc)
@@ -167,6 +171,20 @@ def _scan_one_sample(
         and not state.parse_target_set_changed(sample_state, parse_targets)
         and not any(state.is_file_changed(sample_state, p) for p in parse_targets)
     ):
+        if thumbnail_dir is not None:
+            with session.begin():
+                stored = session.get(orm.SampleORM, sample_loc.sample_id)
+                rel = stored.thumbnail_path if stored else None
+                if rel and not (thumbnail_dir / rel).is_file():
+                    new_rel = thumbnails.generate_thumbnails(
+                        sample_loc.sample_id,
+                        thumbnails.refs_from_db(session, sample_loc.sample_id),
+                        thumbnail_dir,
+                        skip_existing=True,
+                    )
+                    stored.thumbnail_path = new_rel
+                    session.add(stored)
+                    report.thumbnails_healed += 1
         report.skipped += 1
         report.skipped_ids.append(sample_loc.sample_id)
         return
@@ -189,6 +207,14 @@ def _scan_one_sample(
             report.errors.append(f"{sample_loc.sample_id}: {e}")
 
         disk_size = discovery.dir_size_bytes(sample_loc.path)
+        thumb_rel = None
+        if thumbnail_dir is not None:
+            thumb_rel = thumbnails.generate_thumbnails(
+                sample_loc.sample_id,
+                thumbnails.refs_from_record(result.record),
+                thumbnail_dir,
+                skip_existing=False,
+            )
         persistence.upsert_sample_record(
             session,
             result.record,
@@ -196,6 +222,7 @@ def _scan_one_sample(
             warnings=result.warnings,
             scan_run_id=scan_run_id,
             disk_size_bytes=disk_size,
+            thumbnail_path=thumb_rel,
         )
         # Update mtime state for every parse target.
         for p in parse_targets:
