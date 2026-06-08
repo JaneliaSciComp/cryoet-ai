@@ -77,6 +77,53 @@ FRONTEND_PORT=3030
 
 ---
 
+## Testing Docker deployment locally
+
+This models the envisioned production deployment. Nginx is the only port exposed to the host and proxies `/api/*` to FastAPI and everything else to the frontend SSR server.
+
+**Prerequisites:** Docker and Docker Compose installed.
+
+1. Create a `.env` file in the repo root:
+
+```
+CATALOG_DATA_ROOT=/path/to/data
+NGINX_PORT=80            # optional, defaults to 80
+```
+
+2. Build all images:
+
+```
+docker compose build
+```
+
+3. Run the scanner to populate the database (writes into the `catalog-db` Docker volume):
+
+```
+docker compose --profile scan run --rm scanner
+```
+
+`--profile scan` activates the scanner service, which is excluded from the default `docker compose up` because in production it will run as a Kubernetes CronJob. `run --rm` starts it as a one-shot container and removes it when it exits.
+
+4. Start the stack:
+
+```
+docker compose up
+```
+
+Open `http://localhost` (or `http://localhost:<NGINX_PORT>` if you changed the port). The API and frontend ports (8000 and 3000) are internal to the Docker network and not accessible from the host.
+
+### Resetting after schema changes
+
+The SQLite database persists in the `catalog-db` named volume across restarts. If the ORM schema has changed since the DB was created (new columns, renamed enums), the API will return 500 errors. Fix by wiping the volume and rescanning:
+
+```
+docker compose down -v
+docker compose --profile scan run --rm scanner
+docker compose up
+```
+
+---
+
 ## Schema authoring & validation
 
 For researchers writing `sample.toml` / `acquisition.toml`, the authoring guide is in **[`docs/data_organization.md`](docs/data_organization.md)**. Quick commands:
