@@ -84,7 +84,7 @@ tifffile = ">=2024.1"
 eerfile = "*"
 
 [tool.pixi.feature.api.tasks]
-api = "uvicorn cryoet_catalog.api.main:app --reload --port 8000"
+api = "uvicorn cryoet_catalog.api.main:app --port 8000"
 frontend = { cmd = "npm run dev", cwd = "frontend", depends-on = [
     "frontend-install",
 ] }
