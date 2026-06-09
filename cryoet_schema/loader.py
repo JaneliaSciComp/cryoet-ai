@@ -180,6 +180,9 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
     if et == "annotation":
         # entity_pk = (sample_id, acq_id, annotation_id)
         return f"acquisitions.{pk[1]}.annotation[{pk[2]}]"
+    if et == "alignment":
+        # entity_pk = (sample_id, acq_id, alignment_id)
+        return f"acquisitions.{pk[1]}.alignment[{pk[2]}]"
     return et
 
 
@@ -256,6 +259,16 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
                     ExtrasEntry(
                         "annotation",
                         (sample_id, acq_id, ann.annotation_id),
+                        k,
+                        v,
+                    )
+                )
+        for align in acq_file.alignment:
+            for k, v in (align.model_extra or {}).items():
+                out.append(
+                    ExtrasEntry(
+                        "alignment",
+                        (sample_id, acq_id, align.alignment_id),
                         k,
                         v,
                     )

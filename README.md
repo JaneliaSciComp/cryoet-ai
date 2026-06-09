@@ -46,7 +46,9 @@ The central design goal is answering one question across both the experimental a
     Frames/                                  # raw movie frames (.eer / .tiff) + .mdoc
     Gains/                                   # gain reference
     TiltSeries/                              # .mrc + .zarr + .rawtlt
-    Alignments/                              # per-alignment .json (machine-emitted)
+    Alignments/
+      {alignment_id}/                        # one subfolder per alignment run
+        *.json                               # machine-emitted alignment files
     Reconstructions/
       Tomograms/
         {processing_id}/                     # one subfolder per processing pipeline
@@ -118,7 +120,7 @@ Only three fields are required for all entries: `sample.lab_name`, `sample.data_
 
 ### Folder naming rules
 
-Four folder names become primary keys in the portal database: the sample directory (`sample_id`), each acquisition directory (`acquisition_id`), each tomogram processing subfolder (`tomogram_id`), and each annotation subfolder (`annotation_id`). The same strings may also be used in path expressions, URLs, and shell commands, so they are restricted to a conservative, cross-platform-safe allowlist.
+Five folder names become primary keys in the portal database: the sample directory (`sample_id`), each acquisition directory (`acquisition_id`), each tomogram processing subfolder (`tomogram_id`), each annotation subfolder (`annotation_id`), and each alignment subfolder (`alignment_id`). The same strings may also be used in path expressions, URLs, and shell commands, so they are restricted to a conservative, cross-platform-safe allowlist.
 
 A valid id must:
 
@@ -212,7 +214,7 @@ Each `acquisition.toml` grows over time. Record the raw reconstruction once in `
 
 **Rules:**
 - Do **not** delete or modify a tomogram or annotation entry once added. Reprocessing produces a **new** entry with a new `id`, placed at the bottom of the file.
-- The `id` must match one folder name under either `Reconstructions/Tomograms/` or `Reconstructions/Annotations/`.
+- The `id` must match one folder name under `Reconstructions/Tomograms/`, `Reconstructions/Annotations/`, or `Alignments/`.
 - Use `derived_from` and `target_tomogram` to record lineage (see above).
 
 ### 5. Validate
@@ -265,6 +267,9 @@ gouauxlab_20250418_AMmilled29-2/             # sample identity = directory name
       *.mrc
       *.zarr
       *.rawtlt
+    Alignments/
+      imod_patch_v3/                         # one subfolder per alignment run
+        *.json
     Reconstructions/
       Tomograms/
         bp_3dctf_bin4/                       # renamed from "raw/"
