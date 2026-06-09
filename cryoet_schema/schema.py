@@ -200,7 +200,7 @@ class Milling(_Base):
 
 class MdRun(_Base):
     # directory / sample.toml [[md_run]] (folder name = md_run_id = TOML `id`);
-    # one directory per run under {sample_dir}/md_runs/{id}. Simulation data only.
+    # one directory per run under {sample_dir}/MdRuns/{id}. Simulation data only.
     md_run_id: IdStr = Field(alias="id")
     seed: int | None = None
     computer: str | None = None
@@ -287,6 +287,15 @@ class Annotation(_Base):
     files: list[str] = Field(default_factory=list)
 
 
+class Alignment(_Base):
+    # directory / acquisition.toml [[alignment]] (folder name = alignment_id = TOML `id`)
+    alignment_id: IdStr = Field(alias="id")
+    software: str | None = None
+    method: str | None = None
+    # directory scan (artifacts discovered in the alignment folder)
+    files: list[str] = Field(default_factory=list)
+
+
 class MdSource(_Base):
     # acquisition.toml ([md_source]) — simulation provenance for this acquisition.
     # md_run_id must match an [[md_run]] id in the sample's sample.toml.
@@ -303,6 +312,7 @@ class AcquisitionFile(_Base):
     raw_tomogram: RawTomogram | None = None
     post_processed_tomogram: list[PostProcessedTomogram] = Field(default_factory=list)
     annotation: list[Annotation] = Field(default_factory=list)
+    alignment: list[Alignment] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_cross_refs(self) -> "AcquisitionFile":
@@ -320,6 +330,9 @@ class AcquisitionFile(_Base):
         ))
         problems.extend(_case_insensitive_duplicates(
             (a.annotation_id for a in self.annotation), "annotation id"
+        ))
+        problems.extend(_case_insensitive_duplicates(
+            (a.alignment_id for a in self.alignment), "alignment id"
         ))
         for t in tomograms:
             for ref in t.derived_from:

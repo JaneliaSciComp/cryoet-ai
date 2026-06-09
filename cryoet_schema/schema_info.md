@@ -110,11 +110,11 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 
 ### 1g. MD run sub-entity (0..N per sample; simulation data only)
 
-`sample.toml` (`[[md_run]]`) — one entry per molecular-dynamics run. Each `md_run_id` MUST match a directory under `{sample_dir}/md_runs/{id}` (a simulation-only directory variation that holds that run's trajectories and frames). Rejected on `experimental` samples.
+`sample.toml` (`[[md_run]]`) — one entry per molecular-dynamics run. Each `md_run_id` MUST match a directory under `{sample_dir}/MdRuns/{id}` (a simulation-only directory variation that holds that run's trajectories and frames). Rejected on `experimental` samples.
 
 | Field | Type | Source | Notes / researcher mapping |
 |---|---|---|---|
-| `md_run_id` | text (PK) | `directory` ↔ `sample.toml` (`[[md_run]].id`) | Run folder name under `md_runs/`; the TOML `id` must match the folder. |
+| `md_run_id` | text (PK) | `directory` ↔ `sample.toml` (`[[md_run]].id`) | Run folder name under `MdRuns/`; the TOML `id` must match the folder. |
 | `seed` | integer | `sample.toml` (`[[md_run]]`) | RNG seed for the run. |
 | `computer` | text | `sample.toml` (`[[md_run]]`) | Name of the computer used. |
 
@@ -240,3 +240,18 @@ One row per annotation output. Primary key: `(sample_id, acquisition_id, annotat
 | `type` | text | `acquisition.toml` (`[[annotation]]`) | e.g. `membrane_segmentation`, `nucleosome_placement`, `nucleosome_orientation`, `sta_result`. [researcher: Segmentation / Nucleosome orientation / STA results] |
 | `target_tomogram` | text (FK) | `acquisition.toml` (`[[annotation]]`) | Tomogram this was generated from. |
 | `files` | list[text] | `directory` | `.star`, `.mrc`, `.ome.zarr`, `.png` artifacts discovered in the folder. |
+
+---
+
+## 5. Alignment entity
+
+One row per tilt-series alignment output. Primary key: `(sample_id, acquisition_id, alignment_id)`. Each `[[alignment]]` block in `acquisition.toml` corresponds to one `{alignment_id}/` subfolder under the acquisition's `Alignments/` directory.
+
+| Field | Type | Source | Notes / researcher mapping |
+|---|---|---|---|
+| `alignment_id` | text (PK) | `directory` ↔ `acquisition.toml` (`[[alignment]].id`) | Alignment folder name under `Alignments/`, e.g. `imod_patch_v3`; the TOML `id` must match the folder. |
+| `acquisition_id` | text (FK) | `directory` | Parent acquisition folder name. |
+| `sample_id` | text (FK) | `directory` | Parent sample folder name. |
+| `software` | text | `acquisition.toml` (`[[alignment]]`) | Alignment software (e.g. `IMOD`, `AreTomo3`). |
+| `method` | text | `acquisition.toml` (`[[alignment]]`) | e.g. `fiducial`, `patch_tracking`, `feature_tracking`. |
+| `files` | list[text] | `directory` | Machine-emitted alignment artifacts discovered in the folder. |

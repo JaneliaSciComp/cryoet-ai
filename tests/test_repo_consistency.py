@@ -72,20 +72,20 @@ def test_starter_templates_in_sync():
 # simulation skeletons (their TOML contents are identical) and mirrors the two
 # layouts documented under "Proposed directory structure" in README.md.
 _SKELETON_DIRS = {
-    "sample_name_experimental": {
-        "acquisition_name/Frames",
-        "acquisition_name/Gains",
-        "acquisition_name/TiltSeries",
-        "acquisition_name/Alignments",
-        "acquisition_name/Reconstructions/Tomograms/processing_pipeline_id",
-        "acquisition_name/Reconstructions/Annotations/annotation_id",
+    "sample_id_experimental": {
+        "acquisition_id/Frames",
+        "acquisition_id/Gains",
+        "acquisition_id/TiltSeries",
+        "acquisition_id/Alignments/alignment_id",
+        "acquisition_id/Reconstructions/Tomograms/processing_pipeline_id",
+        "acquisition_id/Reconstructions/Annotations/annotation_id",
     },
-    "sample_name_simulation": {
-        "md_runs/md_run_id/Trajectories",
-        "md_runs/md_run_id/Snapshots",
-        "acquisition_name/TiltSeries",
-        "acquisition_name/Reconstructions/Tomograms/processing_pipeline_id",
-        "acquisition_name/Reconstructions/Annotations/annotation_id",
+    "sample_id_simulation": {
+        "MdRuns/md_run_id/Trajectories",
+        "MdRuns/md_run_id/Snapshots",
+        "SyntheticCryoET/acquisition_id/TiltSeries",
+        "SyntheticCryoET/acquisition_id/Reconstructions/Tomograms/processing_pipeline_id",
+        "SyntheticCryoET/acquisition_id/Reconstructions/Annotations/annotation_id",
     },
 }
 
@@ -95,7 +95,8 @@ def test_starter_skeletons_match_documented_layout():
     README documents for its data arm — no missing, extra, or drifted folders.
 
     Guards the experimental/simulation split: simulation drops the movie-frame
-    folders (``Frames``/``Gains``/``Alignments``) and adds ``md_runs/``.
+    folders (``Frames``/``Gains``/``Alignments``), adds ``MdRuns/``, and wraps
+    acquisitions in ``SyntheticCryoET/``.
     """
     templates = _REPO_ROOT / "templates"
     for skeleton, expected in _SKELETON_DIRS.items():

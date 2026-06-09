@@ -13,7 +13,8 @@
 # 2. Append a [[post_processed_tomogram]] block for each tomogram processing pipeline output.
 # 3. Append an [[annotation]] block for each annotation run (segmentation,
 #    particle locations, active zone, etc.).
-# 4. Entries are immutable once added — reprocessing produces a NEW entry
+# 4. Append an [[alignment]] block for each tilt-series alignment run.
+# 5. Entries are immutable once added — reprocessing produces a NEW entry
 #    with a new `id`. Never modify or delete existing entries.
 #
 # The portal reads pixel size, tilt angles, dose, date, voltage, camera,
@@ -81,3 +82,8 @@
 # id              = "<FILL IN>"   # text, MUST equal the annotation's folder name, e.g. "membrain_seg_v10"
 # type            = "<FILL IN>"   # text, e.g. membrane_segmentation | nucleosome_placement | active_zone
 # target_tomogram = "<FILL IN>"   # text, id of the tomogram in this acquisition that this was generated from
+
+# [[alignment]]
+# id       = "<FILL IN>"   # text, MUST equal the alignment's folder name under Alignments/, e.g. "imod_patch_v3"
+# software = "<FILL IN>"   # text, e.g. "IMOD 4.12", "AreTomo3"
+# method   = "<FILL IN>"   # text, e.g. fiducial | patch_tracking | feature_tracking

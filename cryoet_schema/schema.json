@@ -123,12 +123,48 @@
           },
           "title": "Annotation",
           "type": "array"
+        },
+        "alignment": {
+          "items": {
+            "$ref": "#/$defs/Alignment"
+          },
+          "title": "Alignment",
+          "type": "array"
         }
       },
       "required": [
         "acquisition"
       ],
       "title": "AcquisitionFile",
+      "type": "object"
+    },
+    "Alignment": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "software": {
+          "title": "Software",
+          "type": "string"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Alignment",
       "type": "object"
     },
     "Annotation": {

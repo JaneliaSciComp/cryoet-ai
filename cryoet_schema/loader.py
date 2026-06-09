@@ -180,6 +180,9 @@ def _format_extras_location(entry: ExtrasEntry) -> str:
     if et == "annotation":
         # entity_pk = (sample_id, acq_id, annotation_id)
         return f"acquisitions.{pk[1]}.annotation[{pk[2]}]"
+    if et == "alignment":
+        # entity_pk = (sample_id, acq_id, alignment_id)
+        return f"acquisitions.{pk[1]}.alignment[{pk[2]}]"
     return et
 
 
@@ -260,6 +263,16 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
                         v,
                     )
                 )
+        for align in acq_file.alignment:
+            for k, v in (align.model_extra or {}).items():
+                out.append(
+                    ExtrasEntry(
+                        "alignment",
+                        (sample_id, acq_id, align.alignment_id),
+                        k,
+                        v,
+                    )
+                )
     return out
 
 
@@ -329,8 +342,14 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
     }
 
     # Per-acquisition: parse, strip placeholders, validate independently.
+    # Simulation samples wrap their acquisitions in SyntheticCryoET/, so the
+    # acquisition.toml sits one level deeper than the experimental layout.
+    if sample_model.data_source == DataSource.simulation:
+        acq_glob = "SyntheticCryoET/*/acquisition.toml"
+    else:
+        acq_glob = "*/acquisition.toml"
     validated_acqs: dict[str, AcquisitionFile] = {}
-    for acq_toml in sorted(sample_dir.glob("*/acquisition.toml")):
+    for acq_toml in sorted(sample_dir.glob(acq_glob)):
         acq_name = acq_toml.parent.name
         try:
             with acq_toml.open("rb") as f:

@@ -74,10 +74,10 @@ project         = "<FILL IN>"   # enum: synapse | chromatin | nanogold
 
 
 # ── MD runs  (simulation data only; copy the block for each run) ─────────────
-# Each [[md_run]] id MUST match a directory under {sample_dir}/md_runs/{id}.
+# Each [[md_run]] id MUST match a directory under {sample_dir}/MdRuns/{id}.
 
 # [[md_run]]
-# id       = "<FILL IN>"   # text, MUST match a directory name under md_runs/
+# id       = "<FILL IN>"   # text, MUST match a directory name under MdRuns/
 # seed     = "<FILL IN>"   # integer, RNG seed for the run
 # computer = "<FILL IN>"   # text, name of the computer used
 
