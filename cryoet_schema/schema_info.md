@@ -110,11 +110,11 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 
 ### 1g. MD run sub-entity (0..N per sample; simulation data only)
 
-`sample.toml` (`[[md_run]]`) — one entry per molecular-dynamics run. Each `md_run_id` MUST match a directory under `{sample_dir}/md_runs/{id}` (a simulation-only directory variation that holds that run's trajectories and frames). Rejected on `experimental` samples.
+`sample.toml` (`[[md_run]]`) — one entry per molecular-dynamics run. Each `md_run_id` MUST match a directory under `{sample_dir}/MdRuns/{id}` (a simulation-only directory variation that holds that run's trajectories and frames). Rejected on `experimental` samples.
 
 | Field | Type | Source | Notes / researcher mapping |
 |---|---|---|---|
-| `md_run_id` | text (PK) | `directory` ↔ `sample.toml` (`[[md_run]].id`) | Run folder name under `md_runs/`; the TOML `id` must match the folder. |
+| `md_run_id` | text (PK) | `directory` ↔ `sample.toml` (`[[md_run]].id`) | Run folder name under `MdRuns/`; the TOML `id` must match the folder. |
 | `seed` | integer | `sample.toml` (`[[md_run]]`) | RNG seed for the run. |
 | `computer` | text | `sample.toml` (`[[md_run]]`) | Name of the computer used. |
 

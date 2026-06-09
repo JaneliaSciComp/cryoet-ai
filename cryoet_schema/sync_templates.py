@@ -3,13 +3,14 @@
 There are multiple on-disk copies of each researcher template:
 
 - the standalone copies under ``templates/`` (canonical), and
-- the starter-directory copies under ``templates/sample_name_experimental/``
-  and ``templates/sample_name_simulation/`` that a researcher copies
-  wholesale to begin a new sample. The two skeletons differ only in their
+- the starter-directory copies under ``templates/sample_id_experimental/``
+  and ``templates/sample_id_simulation/`` that a researcher copies
+  wholesale to begin a new sample. The two skeletons differ in their
   empty-directory layout (experimental has ``Frames/``/``Gains/``/
-  ``Alignments/``; simulation has ``md_runs/`` and no movie-frame folders) —
-  the ``sample.toml`` / ``acquisition.toml`` contents are identical across
-  both, so each canonical template fans out to both skeletons.
+  ``Alignments/``; simulation has ``MdRuns/`` and wraps acquisitions in
+  ``SyntheticCryoET/``) — the ``sample.toml`` / ``acquisition.toml``
+  contents are identical across both, so each canonical template fans out
+  to both skeletons.
 
 All copies must stay identical to their canonical source. This script
 regenerates the starter copies from the canonical ones.
@@ -31,23 +32,27 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # canonical (source) -> starter copy (generated). Keep these paths in sync
 # with the directory layout documented in README.md. Each canonical template
-# fans out to both the experimental and simulation starter skeletons.
+# fans out to both the experimental and simulation starter skeletons; the
+# simulation skeleton nests acquisitions under SyntheticCryoET/.
 _TEMPLATES = _REPO_ROOT / "templates"
-_STARTER_SKELETONS = ("sample_name_experimental", "sample_name_simulation")
 
 TEMPLATE_PAIRS: list[tuple[Path, Path]] = [
-    pair
-    for skeleton in _STARTER_SKELETONS
-    for pair in (
-        (
-            _TEMPLATES / "sample.toml",
-            _TEMPLATES / skeleton / "sample.toml",
-        ),
-        (
-            _TEMPLATES / "acquisition.toml",
-            _TEMPLATES / skeleton / "acquisition_name" / "acquisition.toml",
-        ),
-    )
+    (
+        _TEMPLATES / "sample.toml",
+        _TEMPLATES / "sample_id_experimental" / "sample.toml",
+    ),
+    (
+        _TEMPLATES / "acquisition.toml",
+        _TEMPLATES / "sample_id_experimental" / "acquisition_id" / "acquisition.toml",
+    ),
+    (
+        _TEMPLATES / "sample.toml",
+        _TEMPLATES / "sample_id_simulation" / "sample.toml",
+    ),
+    (
+        _TEMPLATES / "acquisition.toml",
+        _TEMPLATES / "sample_id_simulation" / "SyntheticCryoET" / "acquisition_id" / "acquisition.toml",
+    ),
 ]
 
 

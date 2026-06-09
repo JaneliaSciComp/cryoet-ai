@@ -342,8 +342,14 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
     }
 
     # Per-acquisition: parse, strip placeholders, validate independently.
+    # Simulation samples wrap their acquisitions in SyntheticCryoET/, so the
+    # acquisition.toml sits one level deeper than the experimental layout.
+    if sample_model.data_source == DataSource.simulation:
+        acq_glob = "SyntheticCryoET/*/acquisition.toml"
+    else:
+        acq_glob = "*/acquisition.toml"
     validated_acqs: dict[str, AcquisitionFile] = {}
-    for acq_toml in sorted(sample_dir.glob("*/acquisition.toml")):
+    for acq_toml in sorted(sample_dir.glob(acq_glob)):
         acq_name = acq_toml.parent.name
         try:
             with acq_toml.open("rb") as f:

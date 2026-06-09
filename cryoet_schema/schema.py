@@ -200,7 +200,7 @@ class Milling(_Base):
 
 class MdRun(_Base):
     # directory / sample.toml [[md_run]] (folder name = md_run_id = TOML `id`);
-    # one directory per run under {sample_dir}/md_runs/{id}. Simulation data only.
+    # one directory per run under {sample_dir}/MdRuns/{id}. Simulation data only.
     md_run_id: IdStr = Field(alias="id")
     seed: int | None = None
     computer: str | None = None
