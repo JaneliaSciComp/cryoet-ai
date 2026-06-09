@@ -24,8 +24,6 @@ spec:
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
-          imagePullSecrets:
-            - name: ghcr-credentials
           containers:
             - name: scanner
               image: ghcr.io/janeliascicomp/ai-cryoet-scanner:latest

@@ -16,8 +16,6 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      imagePullSecrets:
-        - name: ghcr-credentials
       containers:
         - name: frontend
           image: ghcr.io/janeliascicomp/ai-cryoet-frontend:latest
