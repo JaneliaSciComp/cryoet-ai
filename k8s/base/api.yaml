@@ -18,6 +18,17 @@ spec:
       labels:
         app: api
     spec:
+      # The catalog-data PVC is backed by an NFS PV on the building.prfs filer.
+      # Only nodes tagged nfs-dmz=true can reach the filer, so pin the pod there.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nfs-dmz
+                    operator: In
+                    values:
+                      - "true"
       securityContext:
         runAsNonRoot: true
         seccompProfile:

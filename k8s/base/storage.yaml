@@ -4,38 +4,65 @@
 #
 #   catalog-data  — the pre-existing CryoET data tree the scanner walks and the
 #                   API reads. READ-ONLY to the app. This is NOT created or
-#                   populated by the app; it must already exist on cluster
-#                   storage (see DEPLOYMENT.md → "Wiring up the data root").
+#                   populated by the app; it lives on the Janelia NFS filer. It
+#                   is wired up as a STATIC PersistentVolume with an `nfs` source
+#                   plus a PVC bound to it by volumeName (storageClassName: "").
+#                   OpenShift's restricted SCC forbids inline `nfs` volumes in a
+#                   pod, but a PVC backed by an nfs PV is allowed — so the pods
+#                   reference the PVC, not the export directly. Pods that mount
+#                   it must also land on a node that can reach the filer; see the
+#                   nfs-dmz nodeAffinity in api.yaml / scanner.yaml.
 #   catalog-db    — the SQLite catalog DB. Written by the scanner CronJob, read
 #                   by the API. Shared between two different pods, so it needs an
 #                   access mode that allows multiple mounters (ReadWriteMany).
 #   thumbnails    — pre-generated preview PNGs. Written by the scanner, read by
 #                   the API. Also shared, also ReadWriteMany.
 #
-# ReadWriteMany requires a storage class that supports it (NFS, CephFS, etc.).
-# On a Janelia-style cluster the network filer typically provides this; confirm
-# the class name with the HPC/OpenShift team and set it via the overlay if the
-# default class is not RWX-capable.
+# catalog-db and thumbnails are dynamically provisioned; ReadWriteMany requires
+# a storage class that supports it. On this OpenShift/OCS cluster that is
+# ocs-storagecluster-cephfs (the default RBD class is RWO-only) — pinned via the
+# overlay. catalog-data does not use a storage class at all (static binding).
+---
+# Static PV for the CryoET data tree on the NFS filer. Cluster-scoped, so it is
+# not namespaced. accessModes is ReadWriteMany to match the cluster's proven NFS
+# pattern; the app never writes here regardless (the pod volumeMounts are flagged
+# readOnly). nfsvers=3 mirrors the other NFS-backed apps on this cluster.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-cryoet-data
+spec:
+  capacity:
+    storage: 1Ti
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    # Server-side export path. The filer exports /groups3 (the logical
+    # /groups/<lab> tree lives under it), so this is /groups3/... even though the
+    # data's logical path — and the container mountPath / CATALOG_DATA_ROOT — is
+    # /groups/cryoet/cryoet/data/scratch/data.
+    server: building.prfs.janelia.org
+    path: /groups3/cryoet/cryoet/data/scratch/data
+  mountOptions:
+    - hard
+    - nfsvers=3
+    - tcp
+  persistentVolumeReclaimPolicy: Retain
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: catalog-data-pvc
 spec:
-  # The data tree is read-only to both the API and the scanner. ReadOnlyMany
-  # lets both pods mount it concurrently. If the HPC team hands you a volume
-  # that is only ReadWriteMany, change this to ReadWriteMany — the app never
-  # writes here regardless (the mounts below are flagged readOnly).
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteMany
   resources:
     requests:
-      # Sizing here is mostly informational for a pre-provisioned/static volume;
-      # the real capacity comes from the backing export. Set to match what the
-      # HPC team provisions.
       storage: 1Ti
-  # storageClassName / volumeName are intentionally left to the overlay or to a
-  # statically-provisioned PV the HPC team binds. See DEPLOYMENT.md.
+  # Static binding to the NFS PV above. Empty storageClassName disables the
+  # default dynamic provisioner so this binds to nfs-cryoet-data by name.
+  volumeName: nfs-cryoet-data
+  storageClassName: ""
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
