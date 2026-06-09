@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aicryoet
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+# Non-sensitive configuration shared by the api and scanner. Copy
+# config.env.example to config.env and edit before deploying. config.env is
+# gitignored and must not be committed.
+configMapGenerator:
+  - name: cryoet-config
+    envs:
+      - config.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: ghcr.io/janeliascicomp/aicryoet-api
+    newTag: latest
+  - name: ghcr.io/janeliascicomp/aicryoet-frontend
+    newTag: latest
+  - name: ghcr.io/janeliascicomp/aicryoet-scanner
+    newTag: latest

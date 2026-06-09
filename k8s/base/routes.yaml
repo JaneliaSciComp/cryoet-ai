@@ -1,0 +1,21 @@
+# Single OpenShift Route fronting nginx. Edge TLS termination: the cluster
+# router serves its own configured certificate for the hostname and redirects
+# HTTP to HTTPS. No per-application TLS secret is needed (see DEPLOYMENT.md → TLS).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: cryoet
+  annotations:
+    haproxy.router.openshift.io/timeout: 300s
+spec:
+  host: aicryoet.int.janelia.org
+  to:
+    kind: Service
+    name: nginx
+    weight: 100
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

@@ -1,0 +1,67 @@
+# The catalog scanner runs as a CronJob: it walks the data tree, (re)builds the
+# SQLite catalog DB and regenerates thumbnails, then exits. `scan --init` (the
+# image's default command) is idempotent, so the same invocation works for the
+# first run and steady state.
+#
+# Schedule: hourly, on the hour. Adjust to taste. concurrencyPolicy Forbid
+# prevents a long scan from overlapping with the next scheduled run.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scanner
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          imagePullSecrets:
+            - name: ghcr-credentials
+          containers:
+            - name: scanner
+              image: ghcr.io/janeliascicomp/aicryoet-scanner:latest
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              envFrom:
+                - configMapRef:
+                    name: cryoet-config
+              volumeMounts:
+                - name: catalog-data
+                  # Must match CATALOG_DATA_ROOT in the ConfigMap and the API's
+                  # mount path — the scanner records absolute paths under this
+                  # root that the API later resolves.
+                  mountPath: /groups/cryoet/cryoet/data/scratch/data
+                  readOnly: true
+                - name: catalog-db
+                  mountPath: /db
+                - name: thumbnails
+                  mountPath: /thumbnails
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+          volumes:
+            - name: catalog-data
+              persistentVolumeClaim:
+                claimName: catalog-data-pvc
+                readOnly: true
+            - name: catalog-db
+              persistentVolumeClaim:
+                claimName: catalog-db-pvc
+            - name: thumbnails
+              persistentVolumeClaim:
+                claimName: thumbnails-pvc

@@ -91,10 +91,13 @@ The "View in Neuroglancer" feature starts an in-process HTTP server inside the A
 The API must run as a **single worker with `--no-reload`** because the Neuroglancer server is process-global. Running multiple workers or hot-reloading would attempt to bind a second HTTP server on the same port.
 
 ---
+## Production deployment
 
-## Testing Docker deployment locally
+For Kubernetes deployment, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
-This models the envisioned production deployment. Nginx is the only port exposed to the host and proxies `/api/*` to FastAPI and everything else to the frontend SSR server.
+### Testing Docker deployment locally
+
+This models the production deployment using local Docker services. Nginx is the only port exposed to the host and proxies `/api/*` to FastAPI and everything else to the frontend SSR server.
 
 **Prerequisites:** Docker and Docker Compose installed.
 

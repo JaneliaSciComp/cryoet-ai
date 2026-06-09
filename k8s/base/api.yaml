@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  # Must stay at 1 replica. The API runs a single uvicorn worker because the
+  # in-process Neuroglancer HTTP server is process-global (see README →
+  # "Neuroglancer in production"). Multiple replicas would also multiply
+  # writers/readers against the SQLite file.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-credentials
+      containers:
+        - name: api
+          image: ghcr.io/janeliascicomp/aicryoet-api:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8000
+            - name: neuroglancer
+              containerPort: 8050
+          envFrom:
+            - configMapRef:
+                name: cryoet-config
+          volumeMounts:
+            - name: catalog-data
+              # Must equal CATALOG_DATA_ROOT in the ConfigMap. The scanner records
+              # absolute paths under this root and the API validates reads against
+              # it, so the mount path and the env var must match exactly.
+              mountPath: /groups/cryoet/cryoet/data/scratch/data
+              readOnly: true
+            - name: catalog-db
+              mountPath: /db
+            - name: thumbnails
+              mountPath: /thumbnails
+              readOnly: true
+          # The API has no /healthz route, so probe the TCP port. uvicorn accepts
+          # connections only once the app (incl. CATALOG_DATA_ROOT / thumbnail-dir
+          # startup checks) has come up.
+          startupProbe:
+            tcpSocket:
+              port: 8000
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              # Tomogram volumes are read into memory for Neuroglancer launches;
+              # give the API generous headroom relative to the other services.
+              cpu: "2"
+              memory: 4Gi
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: catalog-data
+          persistentVolumeClaim:
+            claimName: catalog-data-pvc
+            readOnly: true
+        - name: catalog-db
+          persistentVolumeClaim:
+            claimName: catalog-db-pvc
+        - name: thumbnails
+          persistentVolumeClaim:
+            claimName: thumbnails-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+    - name: neuroglancer
+      port: 8050
+      targetPort: 8050

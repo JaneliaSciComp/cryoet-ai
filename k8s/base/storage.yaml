@@ -1,0 +1,60 @@
+# Persistent storage for the catalog portal.
+#
+# Three volumes, mirroring the named volumes in docker-compose.yml:
+#
+#   catalog-data  — the pre-existing CryoET data tree the scanner walks and the
+#                   API reads. READ-ONLY to the app. This is NOT created or
+#                   populated by the app; it must already exist on cluster
+#                   storage (see DEPLOYMENT.md → "Wiring up the data root").
+#   catalog-db    — the SQLite catalog DB. Written by the scanner CronJob, read
+#                   by the API. Shared between two different pods, so it needs an
+#                   access mode that allows multiple mounters (ReadWriteMany).
+#   thumbnails    — pre-generated preview PNGs. Written by the scanner, read by
+#                   the API. Also shared, also ReadWriteMany.
+#
+# ReadWriteMany requires a storage class that supports it (NFS, CephFS, etc.).
+# On a Janelia-style cluster the network filer typically provides this; confirm
+# the class name with the HPC/OpenShift team and set it via the overlay if the
+# default class is not RWX-capable.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-data-pvc
+spec:
+  # The data tree is read-only to both the API and the scanner. ReadOnlyMany
+  # lets both pods mount it concurrently. If the HPC team hands you a volume
+  # that is only ReadWriteMany, change this to ReadWriteMany — the app never
+  # writes here regardless (the mounts below are flagged readOnly).
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      # Sizing here is mostly informational for a pre-provisioned/static volume;
+      # the real capacity comes from the backing export. Set to match what the
+      # HPC team provisions.
+      storage: 1Ti
+  # storageClassName / volumeName are intentionally left to the overlay or to a
+  # statically-provisioned PV the HPC team binds. See DEPLOYMENT.md.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-db-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: thumbnails-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
