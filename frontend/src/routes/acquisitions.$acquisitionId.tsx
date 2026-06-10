@@ -45,7 +45,7 @@ export const Route = createFileRoute('/acquisitions/$acquisitionId')({
 
 // Warnings are recorded per-sample with a dotted `location` like
 // `acquisitions.{id}` or `acquisitions.{id}.tomogram[...]` (see
-// cryoet_catalog/assembler.py). Match the acquisition's own location and any
+// catalog/assembler.py). Match the acquisition's own location and any
 // nested child location, but not a sibling whose id shares a prefix.
 function warningsForAcquisition(
   warnings: WarningOut[],

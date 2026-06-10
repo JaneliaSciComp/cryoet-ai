@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cryoet-schema"
+name = "catalog-schema"
 version = "0.1.0"
 description = "Pydantic schema, validator CLI, and catalog scanner for CryoET + AI sample metadata."
 requires-python = ">=3.11"
@@ -17,12 +17,12 @@ dependencies = [
 test = ["pytest>=7.0"]
 
 [project.scripts]
-cryoet-validate = "cryoet_schema.validate:main"
-cryoet-json-schema = "cryoet_schema.generate_json_schema:main"
+validate = "schema.validate:main"
+json-schema = "schema.generate_json_schema:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["cryoet_schema*", "cryoet_catalog*"]
+include = ["schema*", "catalog*"]
 
 [tool.pytest.ini_options]
 # Folded in from the former pytest.ini. `pythonpath = src` puts the src-layout
@@ -54,12 +54,12 @@ pydantic = ">=2.6"
 rapidfuzz = ">=3.0"
 
 [tool.pixi.tasks]
-validate = "python -m cryoet_schema.validate"
-json-schema = "python -m cryoet_schema.generate_json_schema"
-sync-templates = "python -m cryoet_schema.sync_templates"
+validate = "python -m schema.validate"
+json-schema = "python -m schema.generate_json_schema"
+sync-templates = "python -m schema.sync_templates"
 # Regenerate every artifact derived from schema.py + the canonical templates.
 sync = { depends-on = ["json-schema", "sync-templates"] }
-scan = { cmd = "python -m cryoet_catalog scan", default-environment = "catalog" }
+scan = { cmd = "python -m catalog scan", default-environment = "catalog" }
 
 [tool.pixi.feature.test.dependencies]
 pytest = ">=7.0"
@@ -75,8 +75,8 @@ numpy = ">=1.26"
 matplotlib-base = ">=3.8"
 
 [tool.pixi.feature.catalog.tasks]
-migrate = "alembic -c src/cryoet_catalog/migrations/alembic.ini upgrade head"
-migrate-revision = "alembic -c src/cryoet_catalog/migrations/alembic.ini revision --autogenerate -m"
+migrate = "alembic -c src/catalog/migrations/alembic.ini upgrade head"
+migrate-revision = "alembic -c src/catalog/migrations/alembic.ini revision --autogenerate -m"
 
 [tool.pixi.feature.api.dependencies]
 fastapi = ">=0.110"
@@ -93,7 +93,7 @@ tifffile = ">=2024.1"
 eerfile = "*"
 
 [tool.pixi.feature.api.tasks]
-api = "uvicorn cryoet_catalog.api.main:app --port 8000"
+api = "uvicorn catalog.api.main:app --port 8000"
 frontend = { cmd = "npm run dev", cwd = "frontend", depends-on = [
     "frontend-install",
 ] }

@@ -10,8 +10,8 @@ A Pydantic-validated metadata schema, a directory-walking catalog scanner, a Fas
 
 | Path | Contents |
 |---|---|
-| `src/cryoet_schema/` | Authoritative Pydantic schema, JSON Schema generators, and the `validate` CLI. |
-| `src/cryoet_catalog/` | Directory-walking scanner that builds the catalog DB from `sample.toml` + `acquisition.toml` + MDOC/MRC headers. Includes the FastAPI read API under `src/cryoet_catalog/api/`. |
+| `src/schema/` | Authoritative Pydantic schema, JSON Schema generators, and the `validate` CLI. |
+| `src/catalog/` | Directory-walking scanner that builds the catalog DB from `sample.toml` + `acquisition.toml` + MDOC/MRC headers. Includes the FastAPI read API under `src/catalog/api/`. |
 | `frontend/` | React + TanStack Start + Material UI app that reads from the FastAPI server. |
 | `deploy/` | Docker, Kubernetes/OpenShift manifests, nginx config, and the deployment guide (`deploy/DEPLOYMENT.md`). |
 | `templates/` | Starter `sample.toml`, `acquisition.toml`, and directory skeletons, containing the TOML files in the expected locations, for new experimental (cryoET) and simulation (MD + synthetic cyroET) samples. |
@@ -20,7 +20,7 @@ A Pydantic-validated metadata schema, a directory-walking catalog scanner, a Fas
 | `.claude/plans/` | Implementation plans, including the catalog scanner plan. |
 | `pyproject.toml` / `pixi.lock` | PyPI dependencies (`[project]`), and pixi config (`[tool.pixi.*]`). |
 
-For the schema itself, see `src/cryoet_schema/schema_info.md` (human reference) and `src/cryoet_schema/schema.py` (Pydantic source of truth).
+For the schema itself, see `src/schema/schema_info.md` (human reference) and `src/schema/schema.py` (Pydantic source of truth).
 
 ---
 
@@ -33,7 +33,7 @@ For the schema itself, see `src/cryoet_schema/schema_info.md` (human reference) 
 
 The frontend's Node deps are installed automatically the first time you run `pixi run frontend` (and re-run only when `package.json` / `package-lock.json` change). You don't need a separate `npm install` step.
 
-3. Create the database. Pass the path to the data root via the CATALOG_DATA_ROOT env variable. This will scan the samples at that path and create a SQLite database called `cryoet_catalog.db` in your repo root.
+3. Create the database. Pass the path to the data root via the CATALOG_DATA_ROOT env variable. This will scan the samples at that path and create a SQLite database called `catalog.db` in your repo root.
 
 ```
 CATALOG_DATA_ROOT=/path/to/data pixi run scan --init
@@ -150,7 +150,7 @@ For researchers writing `sample.toml` / `acquisition.toml`, the authoring guide 
 | Command | What it does |
 |---|---|
 | `pixi run validate {sample_dir}` | Validate `sample.toml` and all `acquisition.toml` files under a sample directory. |
-| `pixi run json-schema` | Regenerate `src/cryoet_schema/schema.json` and `acquisition.schema.json` from the Pydantic models. Run after any change to `schema.py`. |
+| `pixi run json-schema` | Regenerate `src/schema/schema.json` and `acquisition.schema.json` from the Pydantic models. Run after any change to `schema.py`. |
 | `pixi run test` | Run the test suite. |
 
 ---
@@ -159,4 +159,4 @@ For researchers writing `sample.toml` / `acquisition.toml`, the authoring guide 
 
 - **[`docs/data_organization.md`](docs/data_organization.md)** — directory layout, metadata files, schema rules, researcher workflow.
 - **[`docs/architecture.md`](docs/architecture.md)** — system architecture.
-- **`src/cryoet_schema/schema_info.md`** — every field that lands in the portal DB, grouped by entity, with the source of each (TOML / MDOC / MRC / directory / derived).
+- **`src/schema/schema_info.md`** — every field that lands in the portal DB, grouped by entity, with the source of each (TOML / MDOC / MRC / directory / derived).

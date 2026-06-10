@@ -1,6 +1,6 @@
 # Data organization & metadata
 
-This document describes the on-disk layout and TOML metadata scheme for the CryoET + AI project. It is the authoring guide for researchers and the contract that the catalog scanner (`cryoet_catalog`) reads against.
+This document describes the on-disk layout and TOML metadata scheme for the CryoET + AI project. It is the authoring guide for researchers and the contract that the catalog scanner (`catalog`) reads against.
 
 The central design goal is answering one question across both the experimental and simulation arms of the project: **which conditions have we covered, and which still need cryoET imaging, simulation, or both?**
 
@@ -12,7 +12,7 @@ The central design goal is answering one question across both the experimental a
 
 ### 0. (Optional) Set up VSCode for live TOML validation
 
-Authoring TOML in **VSCode** with the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension gives you in-editor type checking, enum suggestions, and field hints as you fill in the templates. The `#:schema` directive at the top of each template points the extension at `src/cryoet_schema/schema.json` (for `sample.toml`) and `src/cryoet_schema/acquisition.schema.json` (for `acquisition.toml`).
+Authoring TOML in **VSCode** with the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension gives you in-editor type checking, enum suggestions, and field hints as you fill in the templates. The `#:schema` directive at the top of each template points the extension at `src/schema/schema.json` (for `sample.toml`) and `src/schema/acquisition.schema.json` (for `acquisition.toml`).
 
 Skipping the editor setup is fine — `pixi run validate {sample_dir}` (step 5) catches the same errors at the end.
 
@@ -55,7 +55,7 @@ Each `acquisition.toml` grows over time. Record the raw reconstruction once in `
 
 ### 5. Validate
 
-The validate script checks `sample.toml` and every `acquisition.toml` under the sample directory and reports any fields that violate the schema. Validation also runs during database ingestion — see `src/cryoet_schema/schema_info.md` for the full list of fields that will be stored, including those auto-derived from MDOCs, MRC headers, OME-Zarr metadata, and directory structure.
+The validate script checks `sample.toml` and every `acquisition.toml` under the sample directory and reports any fields that violate the schema. Validation also runs during database ingestion — see `src/schema/schema_info.md` for the full list of fields that will be stored, including those auto-derived from MDOCs, MRC headers, OME-Zarr metadata, and directory structure.
 
 #### Option 1: With pixi
 
@@ -78,7 +78,7 @@ For example, using Python's built-in `venv` module:
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e .
-python -m cryoet_schema.validate {sample_dir}
+python -m schema.validate {sample_dir}
 ```
 
 `pip install -e .` reads the same dependency list pixi uses (`[project.dependencies]` in `pyproject.toml`).

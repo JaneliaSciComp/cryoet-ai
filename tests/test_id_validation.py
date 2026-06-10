@@ -8,9 +8,9 @@ from textwrap import dedent
 import pytest
 from pydantic import ValidationError
 
-from cryoet_schema import PostProcessedTomogram, Sample
-from cryoet_schema.schema import _validate_id
-from cryoet_schema.loader import load_sample_record
+from schema import PostProcessedTomogram, Sample
+from schema.schema import _validate_id
+from schema.loader import load_sample_record
 
 
 # ── direct unit tests of _validate_id ────────────────────────────────────────

@@ -15,7 +15,7 @@ services:
     image: ai-cryoet-api:latest
     environment:
       - CATALOG_DATA_ROOT=${CATALOG_DATA_ROOT:?set CATALOG_DATA_ROOT in .env}
-      - CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db
+      - CATALOG_DB_URL=sqlite:////db/catalog.db
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       - CATALOG_THUMBNAIL_DIR=/thumbnails
       - NEUROGLANCER_PORT=8050
@@ -59,7 +59,7 @@ services:
     image: ai-cryoet-scanner:latest
     environment:
       - CATALOG_DATA_ROOT=${CATALOG_DATA_ROOT:?set CATALOG_DATA_ROOT in .env}
-      - CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db
+      - CATALOG_DB_URL=sqlite:////db/catalog.db
       - CATALOG_THUMBNAIL_DIR=/thumbnails
     volumes:
       - ${CATALOG_DATA_ROOT}:${CATALOG_DATA_ROOT}:ro

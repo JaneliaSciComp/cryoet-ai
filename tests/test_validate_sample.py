@@ -1,4 +1,4 @@
-"""Tests for cryoet_schema.loader (formerly scripts.validate)."""
+"""Tests for schema.loader (formerly scripts.validate)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from cryoet_schema.loader import load_sample_record
-from cryoet_schema.validate import main
+from schema.loader import load_sample_record
+from schema.validate import main
 
 
 def _write(path: Path, content: str) -> None:

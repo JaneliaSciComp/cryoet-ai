@@ -19,7 +19,7 @@ COPY pixi.lock pyproject.toml ./
 COPY src ./src
 
 ENV CATALOG_DATA_ROOT=/groups/cryoet/cryoet/data/scratch/data \
-    CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db \
+    CATALOG_DB_URL=sqlite:////db/catalog.db \
     CATALOG_THUMBNAIL_DIR=/thumbnails
 
 CMD ["pixi", "run", "-e", "catalog", "scan", "--init"]

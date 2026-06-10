@@ -147,7 +147,7 @@ export function PreviewThumbnail(props: {
 
 // ── Thumbnail URL helpers ────────────────────────────────────────────────
 
-// Relpath scheme must match cryoet_catalog/thumbnails._relpath.
+// Relpath scheme must match catalog/thumbnails._relpath.
 export function tomogramThumbnailUrl(s: string, a: string, t: string): string {
   const enc = (x: string) => x.split('/').map(encodeURIComponent).join('/')
   return `/api/thumbnails/${enc(s)}/${enc(a)}/${enc(t)}.png`

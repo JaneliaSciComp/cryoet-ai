@@ -1,4 +1,4 @@
-#:schema file:///groups/cryoet/cryoet/data/scratch/cryoet_schema/acquisition.schema.json
+#:schema file:///groups/cryoet/cryoet/data/scratch/src/schema/acquisition.schema.json
 # acquisition.toml — researcher-authored per-acquisition metadata.
 # One file per acquisition, placed at the root of each acquisition directory.
 # The acquisition directory name IS the acquisition's identity — not repeated here.

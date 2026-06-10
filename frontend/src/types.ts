@@ -1,4 +1,4 @@
-// Hand-written mirror of cryoet_catalog/api/schemas.py — keep in sync.
+// Hand-written mirror of catalog/api/schemas.py — keep in sync.
 
 // ── Sample list / summary ────────────────────────────────────────────────
 

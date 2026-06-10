@@ -1,12 +1,12 @@
-"""Tests for cryoet_schema.generate_json_schema and the committed schemas."""
+"""Tests for schema.generate_json_schema and the committed schemas."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from cryoet_schema import AcquisitionFile, SampleRecord
-from cryoet_schema.generate_json_schema import (
+from schema import AcquisitionFile, SampleRecord
+from schema.generate_json_schema import (
     _ACQUISITION_FILENAME,
     _DEFAULT_OUT,
     main,
@@ -67,14 +67,14 @@ def test_strip_nullable_preserves_multi_branch_anyof():
 
 
 def test_committed_schema_matches_pydantic_models():
-    """Guard against drift between cryoet_schema/schema.json and SampleRecord.
+    """Guard against drift between schema/schema.json and SampleRecord.
 
     Regenerate with: `pixi run json-schema`.
     """
     committed = json.loads(Path(_DEFAULT_OUT).read_text())
     expected = strip_nullable(SampleRecord.model_json_schema())
     assert committed == expected, (
-        "cryoet_schema/schema.json is out of sync with SampleRecord. "
+        "schema/schema.json is out of sync with SampleRecord. "
         "Run `pixi run json-schema` to regenerate."
     )
 
@@ -88,6 +88,6 @@ def test_committed_acquisition_schema_matches_pydantic_models():
     committed = json.loads(committed_path.read_text())
     expected = strip_nullable(AcquisitionFile.model_json_schema())
     assert committed == expected, (
-        "cryoet_schema/acquisition.schema.json is out of sync with AcquisitionFile. "
+        "schema/acquisition.schema.json is out of sync with AcquisitionFile. "
         "Run `pixi run json-schema` to regenerate."
     )
