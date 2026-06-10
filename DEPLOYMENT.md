@@ -1,0 +1,278 @@
+# OpenShift Deployment
+
+This guide covers deploying the CryoET catalog portal to an OpenShift cluster
+using [Kustomize](https://kustomize.io/).
+
+## Prerequisites
+
+- An OpenShift cluster with `oc` access
+- A cluster router (`openshift-ingress`) serving a TLS certificate for your
+  hostname — the application relies on the router for edge termination and does
+  not manage its own TLS secret
+- Container images pushed to your registry (see
+  [GitHub Actions workflow](.github/workflows/build-images.yml))
+- A way to mount the CryoET data tree into the cluster (see
+  [Wiring up the data root](#wiring-up-the-data-root))
+
+## Architecture
+
+```
+Route (ai-cryoet.int.janelia.org) — edge TLS, HTTP→HTTPS redirect
+    |
+    v
+  nginx (8080)
+    |  /api/*                      -> api      (8000)   FastAPI read API
+    |  /v /neuroglancer /events ...  -> api      (8050)   in-process Neuroglancer
+    |  everything else             -> frontend (3000)   TanStack Start SSR
+    |
+    v
+  api  ──reads──>  catalog-data (read-only data tree)
+       ──reads──>  catalog-db   (SQLite)        <──writes── scanner (CronJob)
+       ──reads──>  thumbnails   (PNG cache)     <──writes── scanner (CronJob)
+```
+
+There are four runtime components plus one batch job:
+
+| Component | Image | Port(s) | Role |
+|---|---|---|---|
+| `nginx` | `nginxinc/nginx-unprivileged` | 8080 | Edge proxy. The only service behind the Route. |
+| `api` | `ai-cryoet-api` | 8000, 8050 | FastAPI read API + in-process Neuroglancer server. |
+| `frontend` | `ai-cryoet-frontend` | 3000 | Server-rendered React app. |
+| `scanner` | `ai-cryoet-scanner` | — | CronJob: walks the data tree, rebuilds the DB + thumbnails. |
+
+## Directory Structure
+
+```
+k8s/
+├── base/                    # Shared resource definitions
+│   ├── kustomization.yaml
+│   ├── storage.yaml         # PVCs: catalog-data, catalog-db, thumbnails
+│   ├── api.yaml             # FastAPI + Neuroglancer Deployment + Service
+│   ├── frontend.yaml        # SSR frontend Deployment + Service
+│   ├── nginx.yaml           # Edge proxy ConfigMap + Deployment + Service
+│   ├── scanner.yaml         # Catalog scanner CronJob
+│   └── routes.yaml          # OpenShift Route (edge TLS via router)
+└── overlays/
+    └── production/          # Production-specific config
+        ├── kustomization.yaml
+        ├── namespace.yaml
+        └── config.env.example   # Template for non-sensitive environment variables
+```
+
+Copy `config.env.example` to `config.env` and fill in real values. `config.env`
+is gitignored and must not be committed.
+
+## Wiring up the data root
+
+The scanner reads a large, **pre-existing** data tree (e.g.
+`/groups/cryoet/cryoet/data/scratch/data`) and the API reads the same tree to
+serve previews and launch Neuroglancer. Unlike the SQLite DB and the thumbnail
+cache — which the app creates from scratch — this data already lives on storage
+your cluster administrators manage.
+
+In Kubernetes a pod can only read storage that has been explicitly handed to it
+through a **PersistentVolumeClaim (PVC)** — a named request for storage. *Where*
+that storage physically lives (an NFS export, a `/groups` mount, etc.) is
+configured by the cluster/HPC team, not by these manifests.
+
+`k8s/base/storage.yaml` declares a PVC named **`catalog-data-pvc`** as a
+placeholder. Before deploying, take this question to the HPC/OpenShift team:
+
+> *"How do we make `/groups/cryoet/cryoet/data/scratch/data` readable from pods
+> in the `ai-cryoet` namespace, and what should the PVC be called?"*
+
+They will typically do one of:
+
+- **Bind `catalog-data-pvc` to a statically-provisioned PersistentVolume** that
+  points at the existing export. In this case keep the PVC name as-is and they
+  fill in the `storageClassName` / `volumeName` to match their PV.
+- **Hand you an existing PVC name.** In that case either rename it to
+  `catalog-data-pvc`, or change `claimName: catalog-data-pvc` to their name in
+  `api.yaml` and `scanner.yaml`.
+
+Whatever path is mounted **must equal** `CATALOG_DATA_ROOT` in `config.env` and
+the `mountPath` for the `catalog-data` volume in `api.yaml` and `scanner.yaml`
+(all three default to `/groups/cryoet/cryoet/data/scratch/data`). The scanner
+records absolute paths under this root and the API validates reads against it,
+so they must agree exactly.
+
+The other two volumes (`catalog-db-pvc`, `thumbnails-pvc`) are created and
+populated by the app and are shared between the API pod and the scanner pod, so
+they use `ReadWriteMany`. Confirm with the HPC team that the default storage
+class supports `ReadWriteMany` (NFS/CephFS do); if not, set an RWX-capable
+`storageClassName` on those PVCs.
+
+## Deployment Steps
+
+### 1. Configure environment
+
+```bash
+cp k8s/overlays/production/config.env.example k8s/overlays/production/config.env
+```
+
+Edit `config.env`:
+
+- `CATALOG_DATA_ROOT` — the in-cluster mount path of the data tree (must match
+  the volume mountPath; see above)
+- `CORS_ORIGINS` — the public URL of the portal
+- The remaining values rarely change from the template.
+
+This app has no database password, user accounts, or SMTP credentials, so there
+is no `secrets.env` — only the non-sensitive `config.env`.
+
+### 2. Create the namespace
+
+```bash
+oc apply -f k8s/overlays/production/namespace.yaml
+```
+
+### 3. Create the image pull secret for ghcr.io
+
+The container images are hosted on GitHub Container Registry and require
+authentication. Create a [Personal Access Token](https://github.com/settings/tokens)
+(classic) with the `read:packages` scope, then create the pull secret:
+
+```bash
+oc create secret docker-registry ghcr-credentials \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<PAT> \
+  -n ai-cryoet
+```
+
+> **Tip:** To avoid the PAT expiring and breaking pulls, consider a GitHub App
+> or a machine account with a long-lived token, or sync the credential from a
+> vault with [External Secrets](https://external-secrets.io/).
+
+### 4. TLS
+
+The Route in `k8s/base/routes.yaml` uses edge TLS termination without specifying
+a certificate, so the cluster router serves its own configured certificate for
+the hostname. No per-application TLS secret is needed. For a custom certificate,
+extend the Route `spec.tls` block with `certificate`/`key`/`caCertificate` or use
+`externalCertificate` (OpenShift 4.16+).
+
+### 5. Preview the generated manifests
+
+```bash
+oc kustomize k8s/overlays/production
+```
+
+### 6. Deploy
+
+```bash
+oc apply -k k8s/overlays/production
+```
+
+### 7. Populate the catalog (first run)
+
+On a fresh deploy the SQLite DB does not exist yet, so the API serves an empty
+catalog (and some pages may error until the first scan completes). Trigger the
+scanner immediately rather than waiting for the next hourly run:
+
+```bash
+oc -n ai-cryoet create job --from=cronjob/scanner scanner-initial
+oc -n ai-cryoet logs -f job/scanner-initial
+```
+
+### 8. Verify
+
+```bash
+# All pods running
+oc -n ai-cryoet get pods
+
+# API logs
+oc -n ai-cryoet logs -l app=api
+
+# Route admitted
+oc -n ai-cryoet get route cryoet
+```
+
+Then open `https://ai-cryoet.int.janelia.org`.
+
+## Neuroglancer in production
+
+"View in Neuroglancer" starts an HTTP server *inside* the API process on port
+8050. The frontend re-roots the viewer URL onto the page origin (it drops the
+host and port the API reports), so the Neuroglancer paths must be reachable
+through nginx on the same origin as the portal. The nginx ConfigMap in
+`k8s/base/nginx.yaml` proxies Neuroglancer's fixed root paths (`/v`,
+`/neuroglancer`, `/events`, `/state`, `/action`, `/volume_response`,
+`/credentials`) to `api:8050` for exactly this reason.
+
+Because the Neuroglancer server is process-global, the API **must** run as a
+single replica with a single uvicorn worker (the image is built this way). Do
+not scale the `api` Deployment above 1.
+
+## Updating the Application
+
+Pin specific image tags in the overlay's `kustomization.yaml`:
+
+```yaml
+images:
+  - name: ghcr.io/janeliascicomp/ai-cryoet-api
+    newTag: v1.0.0
+  - name: ghcr.io/janeliascicomp/ai-cryoet-frontend
+    newTag: v1.0.0
+  - name: ghcr.io/janeliascicomp/ai-cryoet-scanner
+    newTag: v1.0.0
+```
+
+Then `oc apply -k k8s/overlays/production`. Pushing a `v*.*.*` git tag builds and
+publishes all three images (see the workflow).
+
+## Adding a New Environment
+
+Create a new overlay directory referencing the same base:
+
+```bash
+mkdir -p k8s/overlays/staging
+```
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-cryoet-staging
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+configMapGenerator:
+  - name: cryoet-config
+    envs:
+      - config.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+```
+
+## Troubleshooting
+
+```bash
+# Events and status for a pod
+oc -n ai-cryoet describe pod <pod-name>
+
+# CronJob run history
+oc -n ai-cryoet get jobs
+
+# Run the scanner on demand
+oc -n ai-cryoet create job --from=cronjob/scanner scanner-manual
+
+# Route status (admitted, host, TLS)
+oc -n ai-cryoet describe route cryoet
+
+# Inspect the catalog DB inside the API pod
+oc -n ai-cryoet exec deploy/api -- ls -la /db /thumbnails
+```
+
+**API returns 500s after a schema change.** The SQLite DB in the `catalog-db`
+volume predates the current ORM schema. Re-run the scanner; if it still fails,
+the volume can be wiped (delete and recreate `catalog-db-pvc`) and rescanned —
+the DB is fully rebuildable from the data tree.
+
+**Scanner sees no data / empty catalog.** The `catalog-data` volume is not
+mounted at the path the scanner expects. Confirm `CATALOG_DATA_ROOT`, the volume
+`mountPath`, and what the HPC team actually exported all point at the same tree
+(see [Wiring up the data root](#wiring-up-the-data-root)).

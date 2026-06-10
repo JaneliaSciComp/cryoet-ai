@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-cryoet
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+# Non-sensitive configuration shared by the api and scanner. Copy
+# config.env.example to config.env and edit before deploying. config.env is
+# gitignored and must not be committed.
+configMapGenerator:
+  - name: cryoet-config
+    envs:
+      - config.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+# The base PVCs intentionally omit storageClassName because the right class is
+# cluster-specific. On this OpenShift/OCS cluster the default class
+# (ocs-storagecluster-ceph-rbd) is RBD block storage, which only supports
+# ReadWriteOnce in Filesystem mode and rejects the ReadWriteMany access mode
+# these volumes need. ocs-storagecluster-cephfs is the shared CephFS class and
+# supports it. Pin both PVCs to it here. (catalog-data is not a PVC — it is an
+# inline NFS mount in api.yaml / scanner.yaml.)
+patches:
+  - target:
+      kind: PersistentVolumeClaim
+      name: catalog-db-pvc
+    patch: |-
+      - op: add
+        path: /spec/storageClassName
+        value: ocs-storagecluster-cephfs
+  - target:
+      kind: PersistentVolumeClaim
+      name: thumbnails-pvc
+    patch: |-
+      - op: add
+        path: /spec/storageClassName
+        value: ocs-storagecluster-cephfs
+
+images:
+  - name: ghcr.io/janeliascicomp/ai-cryoet-api
+    newTag: latest
+  - name: ghcr.io/janeliascicomp/ai-cryoet-frontend
+    newTag: latest
+  - name: ghcr.io/janeliascicomp/ai-cryoet-scanner
+    newTag: latest

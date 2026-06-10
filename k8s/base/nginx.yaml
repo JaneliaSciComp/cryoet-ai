@@ -1,0 +1,156 @@
+# Edge reverse proxy. Uses the stock unprivileged nginx image with the config
+# supplied via a ConfigMap (mirrors docker-compose.yml, which bind-mounts
+# nginx.conf). The unprivileged image listens on 8080 and runs as a non-root
+# user, which is what OpenShift's restricted SCC requires.
+#
+# This config differs from the repo-root nginx.conf in one important way: it
+# also proxies Neuroglancer's fixed root paths to the API's :8050 port. The
+# frontend re-roots viewer URLs onto the page origin (dropping the :8050 port),
+# so in a single-route deployment those paths must arrive through nginx.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  default.conf: |
+    upstream api {
+        server api:8000;
+    }
+
+    upstream neuroglancer {
+        server api:8050;
+    }
+
+    upstream frontend {
+        server frontend:3000;
+    }
+
+    server {
+        listen 8080 default_server;
+        server_name _;
+
+        client_max_body_size 100M;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        send_timeout 300s;
+
+        gzip on;
+        gzip_comp_level 6;
+        gzip_min_length 1100;
+        gzip_proxied any;
+        gzip_types
+            text/plain
+            text/css
+            text/javascript
+            application/javascript
+            application/json
+            application/xml
+            image/svg+xml;
+
+        # FastAPI: strip the /api prefix (its routes are mounted at /samples,
+        # /scans, ... with no /api prefix).
+        location /api/ {
+            rewrite ^/api/(.*)$ /$1 break;
+            proxy_pass http://api;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # In-process Neuroglancer server (API :8050). These are Neuroglancer's
+        # fixed root paths: viewer app + bundles (/v), volume info & data chunks
+        # (/neuroglancer), the long-lived state event stream (/events, SSE), and
+        # the state/action/response/credentials channels. Buffering is disabled
+        # so the SSE stream is not held back, and Upgrade headers are forwarded
+        # for websocket transport.
+        location ~ ^/(v|neuroglancer|events|state|action|volume_response|credentials)/ {
+            proxy_pass http://neuroglancer;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+
+        # Everything else: the TanStack Start SSR server.
+        location / {
+            proxy_pass http://frontend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  selector:
+    app: nginx
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

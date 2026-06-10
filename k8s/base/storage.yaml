@@ -1,0 +1,87 @@
+# Persistent storage for the catalog portal.
+#
+# Three volumes, mirroring the named volumes in docker-compose.yml:
+#
+#   catalog-data  — the pre-existing CryoET data tree the scanner walks and the
+#                   API reads. READ-ONLY to the app. This is NOT created or
+#                   populated by the app; it lives on the Janelia NFS filer. It
+#                   is wired up as a STATIC PersistentVolume with an `nfs` source
+#                   plus a PVC bound to it by volumeName (storageClassName: "").
+#                   OpenShift's restricted SCC forbids inline `nfs` volumes in a
+#                   pod, but a PVC backed by an nfs PV is allowed — so the pods
+#                   reference the PVC, not the export directly. Pods that mount
+#                   it must also land on a node that can reach the filer; see the
+#                   nfs-dmz nodeAffinity in api.yaml / scanner.yaml.
+#   catalog-db    — the SQLite catalog DB. Written by the scanner CronJob, read
+#                   by the API. Shared between two different pods, so it needs an
+#                   access mode that allows multiple mounters (ReadWriteMany).
+#   thumbnails    — pre-generated preview PNGs. Written by the scanner, read by
+#                   the API. Also shared, also ReadWriteMany.
+#
+# catalog-db and thumbnails are dynamically provisioned; ReadWriteMany requires
+# a storage class that supports it. On this OpenShift/OCS cluster that is
+# ocs-storagecluster-cephfs (the default RBD class is RWO-only) — pinned via the
+# overlay. catalog-data does not use a storage class at all (static binding).
+---
+# Static PV for the CryoET data tree on the NFS filer. Cluster-scoped, so it is
+# not namespaced. accessModes is ReadWriteMany to match the cluster's proven NFS
+# pattern; the app never writes here regardless (the pod volumeMounts are flagged
+# readOnly). nfsvers=3 mirrors the other NFS-backed apps on this cluster.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-cryoet-data
+spec:
+  capacity:
+    storage: 1Ti
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    # Server-side export path. The filer exports /groups3 (the logical
+    # /groups/<lab> tree lives under it), so this is /groups3/... even though the
+    # data's logical path — and the container mountPath / CATALOG_DATA_ROOT — is
+    # /groups/cryoet/cryoet/data/scratch/data.
+    server: building.prfs.janelia.org
+    path: /groups3/cryoet/cryoet/data/scratch/data
+  mountOptions:
+    - hard
+    - nfsvers=3
+    - tcp
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-data-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Ti
+  # Static binding to the NFS PV above. Empty storageClassName disables the
+  # default dynamic provisioner so this binds to nfs-cryoet-data by name.
+  volumeName: nfs-cryoet-data
+  storageClassName: ""
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-db-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: thumbnails-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi

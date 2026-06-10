@@ -1,0 +1,65 @@
+name: Build Docker Images
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - image: ai-cryoet-api
+            context: .
+            file: ./Dockerfile.api
+          - image: ai-cryoet-frontend
+            context: ./frontend
+            file: ./frontend/Dockerfile
+          - image: ai-cryoet-scanner
+            context: .
+            file: ./Dockerfile.scanner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/janeliascicomp/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=registry,ref=ghcr.io/janeliascicomp/${{ matrix.image }}:latest
+            type=registry,ref=ghcr.io/janeliascicomp/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/janeliascicomp/${{ matrix.image }}:buildcache,mode=max
