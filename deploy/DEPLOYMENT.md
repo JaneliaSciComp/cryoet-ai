@@ -10,7 +10,7 @@ using [Kustomize](https://kustomize.io/).
   hostname — the application relies on the router for edge termination and does
   not manage its own TLS secret
 - Container images pushed to your registry (see
-  [GitHub Actions workflow](.github/workflows/build-images.yml))
+  [GitHub Actions workflow](../.github/workflows/build-images.yml))
 - A way to mount the CryoET data tree into the cluster (see
   [Wiring up the data root](#wiring-up-the-data-root))
 
@@ -43,7 +43,7 @@ There are four runtime components plus one batch job:
 ## Directory Structure
 
 ```
-k8s/
+deploy/k8s/
 ├── base/                    # Shared resource definitions
 │   ├── kustomization.yaml
 │   ├── storage.yaml         # PVCs: catalog-data, catalog-db, thumbnails
@@ -75,7 +75,7 @@ through a **PersistentVolumeClaim (PVC)** — a named request for storage. *Wher
 that storage physically lives (an NFS export, a `/groups` mount, etc.) is
 configured by the cluster/HPC team, not by these manifests.
 
-`k8s/base/storage.yaml` declares a PVC named **`catalog-data-pvc`** as a
+`deploy/k8s/base/storage.yaml` declares a PVC named **`catalog-data-pvc`** as a
 placeholder. Before deploying, take this question to the HPC/OpenShift team:
 
 > *"How do we make `/groups/cryoet/cryoet/data/scratch/data` readable from pods
@@ -107,7 +107,7 @@ class supports `ReadWriteMany` (NFS/CephFS do); if not, set an RWX-capable
 ### 1. Configure environment
 
 ```bash
-cp k8s/overlays/production/config.env.example k8s/overlays/production/config.env
+cp deploy/k8s/overlays/production/config.env.example deploy/k8s/overlays/production/config.env
 ```
 
 Edit `config.env`:
@@ -123,7 +123,7 @@ is no `secrets.env` — only the non-sensitive `config.env`.
 ### 2. Create the namespace
 
 ```bash
-oc apply -f k8s/overlays/production/namespace.yaml
+oc apply -f deploy/k8s/overlays/production/namespace.yaml
 ```
 
 ### 3. Create the image pull secret for ghcr.io
@@ -146,7 +146,7 @@ oc create secret docker-registry ghcr-credentials \
 
 ### 4. TLS
 
-The Route in `k8s/base/routes.yaml` uses edge TLS termination without specifying
+The Route in `deploy/k8s/base/routes.yaml` uses edge TLS termination without specifying
 a certificate, so the cluster router serves its own configured certificate for
 the hostname. No per-application TLS secret is needed. For a custom certificate,
 extend the Route `spec.tls` block with `certificate`/`key`/`caCertificate` or use
@@ -155,13 +155,13 @@ extend the Route `spec.tls` block with `certificate`/`key`/`caCertificate` or us
 ### 5. Preview the generated manifests
 
 ```bash
-oc kustomize k8s/overlays/production
+oc kustomize deploy/k8s/overlays/production
 ```
 
 ### 6. Deploy
 
 ```bash
-oc apply -k k8s/overlays/production
+oc apply -k deploy/k8s/overlays/production
 ```
 
 ### 7. Populate the catalog (first run)
@@ -196,7 +196,7 @@ Then open `https://ai-cryoet.int.janelia.org`.
 8050. The frontend re-roots the viewer URL onto the page origin (it drops the
 host and port the API reports), so the Neuroglancer paths must be reachable
 through nginx on the same origin as the portal. The nginx ConfigMap in
-`k8s/base/nginx.yaml` proxies Neuroglancer's fixed root paths (`/v`,
+`deploy/k8s/base/nginx.yaml` proxies Neuroglancer's fixed root paths (`/v`,
 `/neuroglancer`, `/events`, `/state`, `/action`, `/volume_response`,
 `/credentials`) to `api:8050` for exactly this reason.
 
@@ -218,7 +218,7 @@ images:
     newTag: v1.0.0
 ```
 
-Then `oc apply -k k8s/overlays/production`. Pushing a `v*.*.*` git tag builds and
+Then `oc apply -k deploy/k8s/overlays/production`. Pushing a `v*.*.*` git tag builds and
 publishes all three images (see the workflow).
 
 ## Adding a New Environment
@@ -226,7 +226,7 @@ publishes all three images (see the workflow).
 Create a new overlay directory referencing the same base:
 
 ```bash
-mkdir -p k8s/overlays/staging
+mkdir -p deploy/k8s/overlays/staging
 ```
 
 ```yaml

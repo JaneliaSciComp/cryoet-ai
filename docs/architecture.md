@@ -11,7 +11,7 @@ The repo is a **one-way data pipeline**: filesystem → SQLite → HTTP → brow
                            │  walks tree
                            ▼
    ┌────────────────────────────────────────────────┐
-   │ SCANNER  (cryoet_catalog/, run via CLI)        │
+   │ SCANNER  (src/cryoet_catalog/, run via CLI)        │
    │  • discovery.py     — find samples/files       │
    │  • parsers/         — TOML, MDOC, MRC, OME-Zarr│
    │  • assembler.py     — merge into SampleRecord  │
@@ -31,7 +31,7 @@ The repo is a **one-way data pipeline**: filesystem → SQLite → HTTP → brow
                            │  read-only SELECTs
                            ▼
    ┌────────────────────────────────────────────────┐
-   │ API  (cryoet_catalog/api/, FastAPI on :8000)   │
+   │ API  (src/cryoet_catalog/api/, FastAPI on :8000)   │
    │  GET /samples            — list / detail       │
    │  GET /samples/{id}/warnings                    │
    │  GET /scans              — scan run history    │
@@ -57,14 +57,14 @@ One scan = one transactional walk of a data root, invoked via `python -m cryoet_
 
 | Step | What happens | Where to look |
 |---|---|---|
-| 1. CLI entry | Parses flags (`--force`, `--prune`, `--on-voxel-mismatch`, …) and constructs the engine. | `cryoet_catalog/cli.py` |
-| 2. Walk root | `iter_samples` enumerates sample directories under the root. | `cryoet_catalog/discovery.py` |
-| 3. Gating | For each sample, compare current file mtimes + parse-target set against `scan_state`; skip if unchanged (unless `--force`). | `cryoet_catalog/state.py` |
-| 4. Parse | Extract fields from each source (TOML, MDOC, MRC header, OME-Zarr, frame extension, folder names). | `cryoet_catalog/parsers/` |
-| 5. Assemble | Merge parser outputs into a validated `SampleRecord`; collect warnings + field conflicts. | `cryoet_catalog/assembler.py` |
-| 6. Persist | Idempotent upsert of sample + acquisitions + tomograms + annotations + side tables + extras. | `cryoet_catalog/persistence.py` |
-| 7. Prune (optional) | Soft-delete samples missing from disk, with safety-floor guard. | `cryoet_catalog/persistence.py` |
-| 8. Orchestrate | Drives steps 2–7 inside per-sample transactions and writes the `scans` row. | `cryoet_catalog/scanner.py` |
+| 1. CLI entry | Parses flags (`--force`, `--prune`, `--on-voxel-mismatch`, …) and constructs the engine. | `src/cryoet_catalog/cli.py` |
+| 2. Walk root | `iter_samples` enumerates sample directories under the root. | `src/cryoet_catalog/discovery.py` |
+| 3. Gating | For each sample, compare current file mtimes + parse-target set against `scan_state`; skip if unchanged (unless `--force`). | `src/cryoet_catalog/state.py` |
+| 4. Parse | Extract fields from each source (TOML, MDOC, MRC header, OME-Zarr, frame extension, folder names). | `src/cryoet_catalog/parsers/` |
+| 5. Assemble | Merge parser outputs into a validated `SampleRecord`; collect warnings + field conflicts. | `src/cryoet_catalog/assembler.py` |
+| 6. Persist | Idempotent upsert of sample + acquisitions + tomograms + annotations + side tables + extras. | `src/cryoet_catalog/persistence.py` |
+| 7. Prune (optional) | Soft-delete samples missing from disk, with safety-floor guard. | `src/cryoet_catalog/persistence.py` |
+| 8. Orchestrate | Drives steps 2–7 inside per-sample transactions and writes the `scans` row. | `src/cryoet_catalog/scanner.py` |
 
 ### Database
 
@@ -72,12 +72,12 @@ Plain SQLite via SQLAlchemy. The schema mirrors the Pydantic record: one row per
 
 | Step | What happens | Where to look |
 |---|---|---|
-| 1. Engine + URL | `make_engine` builds a SQLAlchemy engine; default URL is `sqlite:///cryoet_catalog.db`. | `cryoet_catalog/db.py` |
-| 2. Schema init | `init_schema` creates tables idempotently on first use. | `cryoet_catalog/db.py` |
-| 3. Core entity tables | `samples`, `acquisitions`, `tomograms`, `annotations` mirror the Pydantic schema. | `cryoet_catalog/orm.py` |
-| 4. Side tables | One row per sample for optional blocks: `chromatin`, `synapse`, `simulation`, `freezing`, `milling`, `aunp`. | `cryoet_catalog/orm.py` |
-| 5. Extras | Captures un-schemaed TOML keys without losing them. | `cryoet_catalog/orm.py` |
-| 6. Scan bookkeeping | `scans` (run history), `scan_state` (mtime gating), `scan_warnings`, `catalog_meta`. | `cryoet_catalog/orm.py`, `cryoet_catalog/state.py` |
+| 1. Engine + URL | `make_engine` builds a SQLAlchemy engine; default URL is `sqlite:///cryoet_catalog.db`. | `src/cryoet_catalog/db.py` |
+| 2. Schema init | `init_schema` creates tables idempotently on first use. | `src/cryoet_catalog/db.py` |
+| 3. Core entity tables | `samples`, `acquisitions`, `tomograms`, `annotations` mirror the Pydantic schema. | `src/cryoet_catalog/orm.py` |
+| 4. Side tables | One row per sample for optional blocks: `chromatin`, `synapse`, `simulation`, `freezing`, `milling`, `aunp`. | `src/cryoet_catalog/orm.py` |
+| 5. Extras | Captures un-schemaed TOML keys without losing them. | `src/cryoet_catalog/orm.py` |
+| 6. Scan bookkeeping | `scans` (run history), `scan_state` (mtime gating), `scan_warnings`, `catalog_meta`. | `src/cryoet_catalog/orm.py`, `src/cryoet_catalog/state.py` |
 
 ### API
 
@@ -85,14 +85,14 @@ FastAPI app, **read-only**, no auth. Configured via `CATALOG_DB_URL` (defaults t
 
 | Step | What happens | Where to look |
 |---|---|---|
-| 1. App factory + CORS | Creates the FastAPI app, parses CORS origins, registers routers. | `cryoet_catalog/api/main.py` |
-| 2. Engine lifespan | Builds the engine on startup, disposes it on shutdown; respects pre-seeded test engines. | `cryoet_catalog/api/main.py` |
-| 3. Session dependency | Per-request SQLAlchemy session injected into route handlers. | `cryoet_catalog/api/deps.py` |
-| 4. Response schemas | Pydantic models that shape JSON responses. | `cryoet_catalog/api/schemas.py` |
-| 5. `/samples` | List and detail endpoints for samples, acquisitions, tomograms, annotations. | `cryoet_catalog/api/routes/samples.py` |
-| 6. `/scans` | Scan run history. | `cryoet_catalog/api/routes/scans.py` |
-| 7. `/samples/{id}/warnings` | Per-sample warnings collected by the scanner. | `cryoet_catalog/api/routes/warnings.py` |
-| 8. `/extras` | Un-schemaed TOML keys captured during scan. | `cryoet_catalog/api/routes/extras.py` |
+| 1. App factory + CORS | Creates the FastAPI app, parses CORS origins, registers routers. | `src/cryoet_catalog/api/main.py` |
+| 2. Engine lifespan | Builds the engine on startup, disposes it on shutdown; respects pre-seeded test engines. | `src/cryoet_catalog/api/main.py` |
+| 3. Session dependency | Per-request SQLAlchemy session injected into route handlers. | `src/cryoet_catalog/api/deps.py` |
+| 4. Response schemas | Pydantic models that shape JSON responses. | `src/cryoet_catalog/api/schemas.py` |
+| 5. `/samples` | List and detail endpoints for samples, acquisitions, tomograms, annotations. | `src/cryoet_catalog/api/routes/samples.py` |
+| 6. `/scans` | Scan run history. | `src/cryoet_catalog/api/routes/scans.py` |
+| 7. `/samples/{id}/warnings` | Per-sample warnings collected by the scanner. | `src/cryoet_catalog/api/routes/warnings.py` |
+| 8. `/extras` | Un-schemaed TOML keys captured during scan. | `src/cryoet_catalog/api/routes/extras.py` |
 
 ### UI
 

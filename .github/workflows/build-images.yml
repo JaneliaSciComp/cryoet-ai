@@ -18,13 +18,13 @@ jobs:
         include:
           - image: ai-cryoet-api
             context: .
-            file: ./Dockerfile.api
+            file: ./deploy/Dockerfile.api
           - image: ai-cryoet-frontend
             context: ./frontend
             file: ./frontend/Dockerfile
           - image: ai-cryoet-scanner
             context: .
-            file: ./Dockerfile.scanner
+            file: ./deploy/Dockerfile.scanner
 
     steps:
       - name: Checkout code

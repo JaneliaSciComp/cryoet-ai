@@ -12,7 +12,7 @@ The central design goal is answering one question across both the experimental a
 
 ### 0. (Optional) Set up VSCode for live TOML validation
 
-Authoring TOML in **VSCode** with the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension gives you in-editor type checking, enum suggestions, and field hints as you fill in the templates. The `#:schema` directive at the top of each template points the extension at `cryoet_schema/schema.json` (for `sample.toml`) and `cryoet_schema/acquisition.schema.json` (for `acquisition.toml`).
+Authoring TOML in **VSCode** with the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension gives you in-editor type checking, enum suggestions, and field hints as you fill in the templates. The `#:schema` directive at the top of each template points the extension at `src/cryoet_schema/schema.json` (for `sample.toml`) and `src/cryoet_schema/acquisition.schema.json` (for `acquisition.toml`).
 
 Skipping the editor setup is fine — `pixi run validate {sample_dir}` (step 5) catches the same errors at the end.
 
@@ -55,7 +55,7 @@ Each `acquisition.toml` grows over time. Record the raw reconstruction once in `
 
 ### 5. Validate
 
-The validate script checks `sample.toml` and every `acquisition.toml` under the sample directory and reports any fields that violate the schema. Validation also runs during database ingestion — see `cryoet_schema/schema_info.md` for the full list of fields that will be stored, including those auto-derived from MDOCs, MRC headers, OME-Zarr metadata, and directory structure.
+The validate script checks `sample.toml` and every `acquisition.toml` under the sample directory and reports any fields that violate the schema. Validation also runs during database ingestion — see `src/cryoet_schema/schema_info.md` for the full list of fields that will be stored, including those auto-derived from MDOCs, MRC headers, OME-Zarr metadata, and directory structure.
 
 #### Option 1: With pixi
 

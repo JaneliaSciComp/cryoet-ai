@@ -14,9 +14,9 @@ RUN pixi install --locked -e catalog
 
 FROM base AS runtime
 COPY --from=deps /app/.pixi /app/.pixi
+# Packages live under src/ (src layout); pixi activation sets PYTHONPATH=src.
 COPY pixi.lock pyproject.toml ./
-COPY cryoet_schema ./cryoet_schema
-COPY cryoet_catalog ./cryoet_catalog
+COPY src ./src
 
 ENV CATALOG_DATA_ROOT=/groups/cryoet/cryoet/data/scratch/data \
     CATALOG_DB_URL=sqlite:////db/cryoet_catalog.db \

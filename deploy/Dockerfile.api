@@ -14,9 +14,10 @@ RUN pixi install --locked -e api
 
 FROM base AS runtime
 COPY --from=deps /app/.pixi /app/.pixi
+# Packages live under src/ (src layout). pixi's activation sets PYTHONPATH=src
+# (relative to WORKDIR /app), so cryoet_catalog/cryoet_schema import cleanly.
 COPY pixi.lock pyproject.toml ./
-COPY cryoet_schema ./cryoet_schema
-COPY cryoet_catalog ./cryoet_catalog
+COPY src ./src
 
 # CATALOG_DATA_ROOT must match the path scanner used when writing the DB —
 # the API resolves DB-recorded paths against this and rejects anything outside.
