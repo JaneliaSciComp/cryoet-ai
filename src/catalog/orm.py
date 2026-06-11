@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from schema.schema import _ID_MAX_LEN, DataSource, Project
+from schema.schema import _ID_MAX_LEN, DataSource, DatasetType, Project
 
 
 class Base(DeclarativeBase):
@@ -140,7 +140,9 @@ class SimulationORM(Base):
         ForeignKey("samples.sample_id"),
         primary_key=True,
     )
-    dataset_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    dataset_type: Mapped[DatasetType | None] = mapped_column(
+        SAEnum(DatasetType), nullable=True
+    )
 
 
 class FreezingORM(Base):

@@ -142,7 +142,11 @@ def assemble_sample(sample_loc: SampleLocation) -> AssemblyResult:
     result = AssemblyResult(record=None)
 
     # ── Step 1: TOML ─────────────────────────────────────────────────────────
-    load = load_sample_toml(sample_loc.path)
+    load = load_sample_toml(
+        sample_loc.path,
+        data_source=sample_loc.data_source,
+        dataset_type=sample_loc.dataset_type,
+    )
 
     for w in load.warnings:
         result.warnings.append(_categorize_loader_warning(w))

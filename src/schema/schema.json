@@ -281,6 +281,16 @@
       "title": "DataSource",
       "type": "string"
     },
+    "DatasetType": {
+      "enum": [
+        "bulk",
+        "chromatin_fiber",
+        "single_molecule",
+        "slab"
+      ],
+      "title": "DatasetType",
+      "type": "string"
+    },
     "Fiducial": {
       "additionalProperties": true,
       "properties": {
@@ -631,7 +641,6 @@
         }
       },
       "required": [
-        "data_source",
         "project"
       ],
       "title": "Sample",
@@ -641,8 +650,7 @@
       "additionalProperties": true,
       "properties": {
         "dataset_type": {
-          "title": "Dataset Type",
-          "type": "string"
+          "$ref": "#/$defs/DatasetType"
         }
       },
       "title": "Simulation",

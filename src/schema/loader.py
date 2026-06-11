@@ -35,6 +35,7 @@ from schema import (
     Sample,
     SampleRecord,
 )
+from schema.layout import infer_arm
 
 
 _PLACEHOLDER = "<FILL IN>"
@@ -375,8 +376,21 @@ def _walk_extras(record: SampleRecord) -> list[ExtrasEntry]:
 # ── main entry point ─────────────────────────────────────────────────────────
 
 
-def load_sample_record(sample_dir: Path) -> LoadResult:
+def load_sample_record(
+    sample_dir: Path,
+    *,
+    data_source: DataSource | None = None,
+    dataset_type=None,
+) -> LoadResult:
     """Load and validate a sample directory; return a ``LoadResult``.
+
+    ``data_source`` / ``dataset_type`` describe the directory-derived arm
+    (``MdSimulation/<SubDir>/`` vs ``Experimental/``). When omitted they are
+    derived from ``sample_dir``'s ancestry via ``infer_arm`` so the ``validate``
+    CLI — which calls with no kwargs — gets the same arm the scanner assigns.
+    The directory is the source of truth: the derived ``data_source`` overrides
+    any value authored in ``sample.toml`` (a mismatch surfaces as a warning),
+    and the derived ``dataset_type`` is injected into the ``[simulation]`` block.
 
     Per-acquisition isolation: a bad ``acquisition.toml`` (parse error
     or validation failure) appears in ``acquisition_errors`` and is
@@ -388,6 +402,10 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
     of the form ``"<dotted.path>: unfilled <FILL IN> placeholder"``.
     """
     result = LoadResult(record=None)
+
+    # Derive the arm from the path when not supplied (validate CLI path).
+    if data_source is None and dataset_type is None:
+        data_source, dataset_type = infer_arm(sample_dir)
 
     sample_toml = sample_dir / "sample.toml"
     if not sample_toml.is_file():
@@ -407,6 +425,30 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
     # Inject sample_id from the directory name (preserve _minimal_sample
     # behaviour from the old script).
     sample_data.setdefault("sample", {})["sample_id"] = sample_dir.name
+
+    # data_source resolution: the directory is the source of truth and is no
+    # longer authored in sample.toml. When the path is under a recognized arm,
+    # the directory-derived value is injected; otherwise we fall back to any
+    # value still present in a legacy sample.toml (or leave it unset, since the
+    # field is now Optional) so out-of-arm `validate` runs still load.
+    authored_ds = sample_data["sample"].get("data_source")
+    effective_ds = data_source if data_source is not None else authored_ds
+    if data_source is not None:
+        ds_value = (
+            data_source.value
+            if isinstance(data_source, DataSource)
+            else data_source
+        )
+        # Directory wins — write it back before validation.
+        sample_data["sample"]["data_source"] = ds_value
+
+    # dataset_type injection: the directory (MdSimulation/<SubDir>/) is the
+    # source of truth for the simulation dataset_type; researchers no longer
+    # author it. Inject before SampleRecord validation.
+    if dataset_type is not None:
+        sample_data.setdefault("simulation", {})["dataset_type"] = (
+            dataset_type.value if hasattr(dataset_type, "value") else dataset_type
+        )
 
     # Validate the sample-level portion. The Sample model only consumes
     # the [sample] table; the rest of sample.toml ([chromatin], [label],
@@ -440,7 +482,7 @@ def load_sample_record(sample_dir: Path) -> LoadResult:
     # Per-acquisition: parse, strip placeholders, validate independently.
     # Simulation samples wrap their acquisitions in SyntheticCryoET/, so the
     # acquisition.toml sits one level deeper than the experimental layout.
-    if sample_model.data_source == DataSource.simulation:
+    if effective_ds == DataSource.simulation or effective_ds == DataSource.simulation.value:
         acq_glob = "SyntheticCryoET/*/acquisition.toml"
     else:
         acq_glob = "*/acquisition.toml"

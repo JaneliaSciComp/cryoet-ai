@@ -2,7 +2,7 @@
 
 Covers every field in docs/schema.md. Fields are grouped by authoritative source within each class:
 
-- sample.toml / acquisition.toml — researcher-authored; required on ingest only for ``sample.data_source`` and ``sample.project``.
+- sample.toml / acquisition.toml — researcher-authored; required on ingest only for ``sample.project`` (``sample.data_source`` is directory-derived, not authored).
 - MDOC — parsed from ``.mdoc`` files under each acquisition's ``Frames/``.
 - MRC header — read from tomogram ``.mrc`` headers.
 - OME-Zarr .zattrs — read from multiscale ``.ome.zarr`` arrays.
@@ -130,11 +130,23 @@ class Project(str, Enum):
     nanogold = "nanogold"
 
 
+class DatasetType(str, Enum):
+    bulk = "bulk"
+    chromatin_fiber = "chromatin_fiber"
+    single_molecule = "single_molecule"
+    slab = "slab"
+
+
 class Sample(_Base):
     # directory (sample folder name, injected on load)
     sample_id: IdStr | None = None
+    # directory (top-level arm: Experimental/ -> experimental,
+    # MdSimulation/<SubDir>/ -> simulation). Derived from the path by the
+    # scanner / loader (infer_arm) and no longer authored in sample.toml;
+    # Optional so a flat/legacy dir validated outside the arm layout still
+    # loads. NOT NULL in the DB (always set on the scan path).
+    data_source: DataSource | None = None
     # sample.toml ([sample])
-    data_source: DataSource
     project: Project
     type: str | None = None
     cell_type: str | None = None
@@ -146,7 +158,9 @@ class Sample(_Base):
 
 
 class Simulation(_Base):
-    dataset_type: str | None = None
+    # Derived from the top-level directory (MdSimulation/<SubDir>/) by the
+    # scanner / loader's infer_arm; no longer researcher-authored.
+    dataset_type: DatasetType | None = None
 
 
 class Chromatin(_Base):

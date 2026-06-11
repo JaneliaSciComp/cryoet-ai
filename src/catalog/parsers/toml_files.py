@@ -14,15 +14,24 @@ from __future__ import annotations
 from pathlib import Path
 
 from schema.loader import LoadResult, load_sample_record
+from schema.schema import DataSource, DatasetType
 
 
-def load_sample_toml(sample_dir: Path) -> LoadResult:
+def load_sample_toml(
+    sample_dir: Path,
+    *,
+    data_source: DataSource | None = None,
+    dataset_type: DatasetType | None = None,
+) -> LoadResult:
     """Validate every TOML under ``sample_dir``.
 
-    Returns the ``LoadResult`` from ``schema.loader.load_sample_record``
-    unchanged.
+    ``data_source`` / ``dataset_type`` (the directory-derived arm) are threaded
+    through to ``load_sample_record`` so the directory remains the source of
+    truth. Returns the ``LoadResult`` unchanged.
     """
-    return load_sample_record(sample_dir)
+    return load_sample_record(
+        sample_dir, data_source=data_source, dataset_type=dataset_type
+    )
 
 
 __all__ = ["load_sample_toml", "LoadResult"]
