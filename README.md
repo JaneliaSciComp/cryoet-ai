@@ -35,10 +35,6 @@ The frontend's Node deps are installed automatically the first time you run `pix
 
 3. Create the database. Pass the path to the data root via the CATALOG_DATA_ROOT env variable. This will scan the samples at that path and create a SQLite database called `catalog.db` in your repo root.
 
-```
-CATALOG_DATA_ROOT=/path/to/data pixi run scan --init
-```
-
 To also pre-generate tomogram thumbnails, set `CATALOG_THUMBNAIL_DIR` to a writable directory (or pass `--thumbnail-dir`). A plain rescan auto-heals a wiped cache; `--force` fully rebuilds it.
 
 ```
@@ -149,7 +145,7 @@ docker compose up
 1. Edit `schema.py` and the canonical template(s) — `templates/sample.toml` / `templates/acquisition.toml`.
 2. Run `pixi run sync` to regenerate the derived artifacts: `schema.json`, `acquisition.schema.json`, and the `templates/sample_id_{data_type}/` starter copies.
 3. Update `docs/schema.md`, the human-readable schema documentation for every stored field, including DB-only ones not in any TOML.
-4. Run `pixi run test -- tests/test_repo_consistency.py tests/test_generate_json_schema.py`. The drift guards in `tests/test_repo_consistency.py` and `tests/test_generate_json_schema.py` fail with a fix hint if the generated schemas, starter copies, or docs are out of date.
+4. Run `pixi run -e api test -- tests/test_repo_consistency.py tests/test_generate_json_schema.py`. The drift guards in `tests/test_repo_consistency.py` and `tests/test_generate_json_schema.py` fail with a fix hint if the generated schemas, starter copies, or docs are out of date.
 
 ---
 

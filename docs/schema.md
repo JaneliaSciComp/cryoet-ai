@@ -27,7 +27,7 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 |---|---|---|---|---|
 | `sample_id` | text (PK) | `directory` | derived | Sample folder name. |
 | `lab_name` | enum | `sample.toml` (`[sample]`) | researcher authored | `collepardo`, `gouaux`, `rosen`, or `villa` |
-| `data_source` | enum | `sample.toml` (`[sample]`) | researcher authored | `experimental` or `simulation`. |
+| `data_source` | enum | directory (top-level arm) | derived | `experimental` (under `Experimental/`) or `simulation` (under `MdSimulation/`). Not authored in `sample.toml`. |
 | `project` | enum | `sample.toml` (`[sample]`) | researcher authored | `chromatin`, `synapse`, or `nanogold`. |
 | `type` | text | `sample.toml` (`[sample]`) | researcher authored | e.g. `cellular` / `reconstituted`. |
 | `cell_type` | text | `sample.toml` (`[sample]`) | researcher authored | Required when `type = cellular`. |
@@ -99,17 +99,21 @@ One row per sample. Primary key: `sample_id` (the sample directory name).
 
 | Field | Type | Source | Source Type | Notes |
 |---|---|---|---|---|
-| `dataset_type` | text | `sample.toml` (`[simulation]`) | researcher authored | e.g. `single_molecule` / `slab` / `bulk`. |
+| `dataset_type` | enum | `directory` (`MdSimulation/<SubDir>/`) | derived | One of `bulk`, `chromatin_fiber`, `single_molecule`, `slab` — derived from the `MdSimulation/{Bulk,ChromatinFiber,SingleMolecule,Slab}/` subdirectory, **not** authored in `sample.toml`. |
 
 ### 1g. MD run sub-entity (0..N per sample; simulation data only)
 
-`sample.toml` (`[[md_run]]`) — one entry per molecular-dynamics run. Each `md_run_id` MUST match a directory under `{sample_dir}/MdRuns/{id}` (a simulation-only directory variation that holds that run's trajectories and frames). Rejected on `experimental` samples.
+`MdRuns/{id}/md_run.toml` — one file per molecular-dynamics run, where the run's folder name under `{sample_dir}/MdRuns/{id}` *is* its identity (the `id` field is not authored, matching the sample/acquisition convention). Each folder holds that run's trajectories and frames. Rejected on `experimental` samples.
 
 | Field | Type | Source | Source Type | Notes |
 |---|---|---|---|---|
-| `md_run_id` | text (PK) | `directory` ↔ `sample.toml` (`[[md_run]].id`) | researcher authored | Run folder name under `MdRuns/`; the TOML `id` must match the folder. |
-| `seed` | integer | `sample.toml` (`[[md_run]]`) | researcher authored | RNG seed for the run. |
-| `computer` | text | `sample.toml` (`[[md_run]]`) | researcher authored | Name of the computer used. |
+| `md_run_id` | text (PK) | `directory` | derived | Run folder name under `MdRuns/` — the source of identity. |
+| `seed` | integer | `MdRuns/{id}/md_run.toml` | researcher authored | RNG seed for the run. |
+| `sample_time` | float | `MdRuns/{id}/md_run.toml` | researcher authored | Total simulated time. |
+| `timestep` | float | `MdRuns/{id}/md_run.toml` | researcher authored | Integration timestep. |
+| `computer` | text | `MdRuns/{id}/md_run.toml` | researcher authored | Name of the computer used. |
+| `reference_contact` | text | `MdRuns/{id}/md_run.toml` | researcher authored | Reference or contact for the run. |
+| `force_field_version` | text | `MdRuns/{id}/md_run.toml` | researcher authored | Force-field version used. |
 
 ---
 
@@ -127,7 +131,8 @@ One row per imaging position. Primary key: `(sample_id, acquisition_id)`.
 | `energy_filter` | text | `acquisition.toml` (`[acquisition]`) | researcher authored | Model name. |
 | `phase_plate` | boolean | `acquisition.toml` (`[acquisition]`) | researcher authored | |
 | `microscope` | text | `acquisition.toml` (`[acquisition]`) | researcher authored | Model name. |
-| `quality` | text | `acquisition.toml` (`[acquisition]`) | researcher authored | e.g., "high", "medium", "low" |
+| `facility` | text | `acquisition.toml` (`[acquisition]`) | researcher authored | Imaging facility, e.g. `Janelia`. |
+| `tilt_series_quality_score` | integer | `acquisition.toml` (`[acquisition]`) | researcher authored | 1–5 rubric: **5** Excellent, **4** Good, **3** Fair, **2** Poor, **1** Low. |
 | `pixel_size` | float | `MDOC` | derived | Angstrom. |
 | `dose_per_tilt` | list[float] | `MDOC` | derived | e/Å² per tilt. |
 | `total_dose` | float | `MDOC` (summed) | derived | e/Å². |
@@ -179,7 +184,7 @@ can be ingested before MDOC parse succeeds.
 
 | Field | Type | Source | Source Type | Notes |
 |---|---|---|---|---|
-| `md_run_id` | text (FK) | `acquisition.toml` (`[md_source]`) | researcher authored | MUST match an `md_run_id` in the sample's `sample.toml` `[[md_run]]`. |
+| `md_run_id` | text (FK) | `acquisition.toml` (`[md_source]`) | researcher authored | Should match an `MdRuns/{id}/` folder name in the sample; a dangling ref warns rather than failing the acquisition. |
 | `frame` | integer | `acquisition.toml` (`[md_source]`) | researcher authored | Frame/snapshot index within the MD run. |
 
 ---
