@@ -31,9 +31,15 @@
           "title": "Microscope",
           "type": "string"
         },
-        "quality": {
-          "title": "Quality",
+        "facility": {
+          "title": "Facility",
           "type": "string"
+        },
+        "tilt_series_quality_score": {
+          "title": "Tilt Series Quality Score",
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
         },
         "pixel_size": {
           "title": "Pixel Size",
@@ -281,6 +287,16 @@
       "title": "DataSource",
       "type": "string"
     },
+    "DatasetType": {
+      "enum": [
+        "bulk",
+        "chromatin_fiber",
+        "single_molecule",
+        "slab"
+      ],
+      "title": "DatasetType",
+      "type": "string"
+    },
     "Fiducial": {
       "additionalProperties": true,
       "properties": {
@@ -409,8 +425,24 @@
           "title": "Seed",
           "type": "integer"
         },
+        "sample_time": {
+          "title": "Sample Time",
+          "type": "number"
+        },
+        "timestep": {
+          "title": "Timestep",
+          "type": "number"
+        },
         "computer": {
           "title": "Computer",
+          "type": "string"
+        },
+        "reference_contact": {
+          "title": "Reference Contact",
+          "type": "string"
+        },
+        "force_field_version": {
+          "title": "Force Field Version",
           "type": "string"
         }
       },
@@ -613,6 +645,9 @@
         "project": {
           "$ref": "#/$defs/Project"
         },
+        "lab_name": {
+          "$ref": "#/$defs/LabName"
+        },
         "type": {
           "title": "Type",
           "type": "string"
@@ -631,7 +666,6 @@
         }
       },
       "required": [
-        "data_source",
         "project"
       ],
       "title": "Sample",
@@ -641,8 +675,7 @@
       "additionalProperties": true,
       "properties": {
         "dataset_type": {
-          "title": "Dataset Type",
-          "type": "string"
+          "$ref": "#/$defs/DatasetType"
         }
       },
       "title": "Simulation",
@@ -738,9 +771,6 @@
   "properties": {
     "sample": {
       "$ref": "#/$defs/Sample"
-    },
-    "lab_name": {
-      "$ref": "#/$defs/LabName"
     },
     "simulation": {
       "$ref": "#/$defs/Simulation"

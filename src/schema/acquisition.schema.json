@@ -31,9 +31,15 @@
           "title": "Microscope",
           "type": "string"
         },
-        "quality": {
-          "title": "Quality",
+        "facility": {
+          "title": "Facility",
           "type": "string"
+        },
+        "tilt_series_quality_score": {
+          "title": "Tilt Series Quality Score",
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
         },
         "pixel_size": {
           "title": "Pixel Size",

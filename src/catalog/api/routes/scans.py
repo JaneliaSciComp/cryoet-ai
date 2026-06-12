@@ -1,5 +1,6 @@
-"""GET /scans, /scans/latest, /scans/latest/warnings, /scans/latest/samples,
-/scans/{scan_run_id}, /scans/{scan_run_id}/warnings, /scans/{scan_run_id}/samples."""
+"""GET /scans, /scans/latest, /scans/latest/warnings, /scans/latest/run-warnings,
+/scans/latest/samples, /scans/{scan_run_id}, /scans/{scan_run_id}/warnings,
+/scans/{scan_run_id}/run-warnings, /scans/{scan_run_id}/samples."""
 from __future__ import annotations
 from typing import Literal
 
@@ -9,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from catalog import orm
 from catalog.api.deps import get_session
-from catalog.api.schemas import ScanOut, ScanSampleOut, SampleWarningsGroup
+from catalog.api.schemas import (
+    RunWarningOut,
+    ScanOut,
+    ScanSampleOut,
+    SampleWarningsGroup,
+)
 
 router = APIRouter()
 
@@ -56,6 +62,23 @@ def _scan_warnings(session: Session, scan_run_id: str) -> list[SampleWarningsGro
     return [
         SampleWarningsGroup(sample_id=sid, warnings=msgs)
         for sid, msgs in grouped.items()
+    ]
+
+
+def _run_warnings(session: Session, scan_run_id: str) -> list[RunWarningOut]:
+    """Run-level (no-sample) warnings for a single scan run, ordered by id."""
+    rows = session.execute(
+        select(orm.ScanRunWarningsORM)
+        .where(orm.ScanRunWarningsORM.scan_run_id == scan_run_id)
+        .order_by(orm.ScanRunWarningsORM.id)
+    ).scalars().all()
+    return [
+        RunWarningOut(
+            id=r.id, category=r.category, location=r.location,
+            message=r.message, detected_at=r.detected_at,
+            scan_run_id=r.scan_run_id,
+        )
+        for r in rows
     ]
 
 
@@ -148,6 +171,15 @@ def get_latest_scan_warnings(session: Session = Depends(get_session)):
     return _scan_warnings(session, latest)
 
 
+@router.get("/latest/run-warnings", response_model=list[RunWarningOut])
+def get_latest_run_warnings(session: Session = Depends(get_session)):
+    """Run-level warnings from the latest completed scan (empty if none)."""
+    latest = _latest_completed_scan_id(session)
+    if latest is None:
+        return []
+    return _run_warnings(session, latest)
+
+
 @router.get("/latest/samples", response_model=list[ScanSampleOut])
 def get_latest_scan_samples(
     outcome: Outcome = Query(...),
@@ -180,6 +212,14 @@ def get_scan_warnings(scan_run_id: str, session: Session = Depends(get_session))
     if session.get(orm.ScansORM, scan_run_id) is None:
         raise HTTPException(status_code=404, detail="scan not found")
     return _scan_warnings(session, scan_run_id)
+
+
+@router.get("/{scan_run_id}/run-warnings", response_model=list[RunWarningOut])
+def get_run_warnings(scan_run_id: str, session: Session = Depends(get_session)):
+    """Run-level warnings for a specific scan run. 404 if unknown."""
+    if session.get(orm.ScansORM, scan_run_id) is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+    return _run_warnings(session, scan_run_id)
 
 
 @router.get("/{scan_run_id}/samples", response_model=list[ScanSampleOut])

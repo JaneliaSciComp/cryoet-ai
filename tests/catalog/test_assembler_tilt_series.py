@@ -7,6 +7,8 @@ from textwrap import dedent
 
 import pytest
 
+from schema.schema import DataSource
+
 from catalog.assembler import assemble_sample
 from catalog.discovery import SampleLocation
 
@@ -57,6 +59,8 @@ def _sample_loc(sample_dir: Path) -> SampleLocation:
         path=sample_dir,
         sample_id=sample_dir.name,
         sample_toml=sample_dir / "sample.toml",
+        data_source=DataSource.experimental,
+        dataset_type=None,
     )
 
 

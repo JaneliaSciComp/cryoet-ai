@@ -1,0 +1,6 @@
+[sample]
+data_source = "simulation"
+project = "chromatin"
+
+# [simulation] dataset_type is derived from the MdSimulation/<SubDir>/ directory
+# (here SingleMolecule -> single_molecule) by the scanner/loader; not authored.

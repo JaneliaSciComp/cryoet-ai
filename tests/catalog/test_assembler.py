@@ -9,6 +9,8 @@ import mrcfile
 import numpy as np
 import pytest
 
+from schema.schema import DataSource, DatasetType
+
 from catalog.assembler import (
     AssemblyResult,
     ScanWarning,
@@ -65,11 +67,18 @@ def _make_zattrs(zarr_dir: Path, scale=(11.72, 11.72, 11.72)) -> None:
     )
 
 
-def _sample_loc(sample_dir: Path) -> SampleLocation:
+def _sample_loc(
+    sample_dir: Path,
+    *,
+    data_source: DataSource = DataSource.experimental,
+    dataset_type: DatasetType | None = None,
+) -> SampleLocation:
     return SampleLocation(
         path=sample_dir,
         sample_id=sample_dir.name,
         sample_toml=sample_dir / "sample.toml",
+        data_source=data_source,
+        dataset_type=dataset_type,
     )
 
 
@@ -380,3 +389,137 @@ def test_undeclared_annotation_folder_warns(tmp_path):
     assert len(undeclared) == 1
     assert "stray_ann" in undeclared[0].location
     assert "stray_ann" in undeclared[0].message
+
+
+def test_data_source_derived_from_directory(tmp_path):
+    """data_source is no longer authored; the directory arm is the source of
+    truth and is injected silently (no mismatch warning), overriding any
+    legacy value still present in sample.toml."""
+    sample_dir = tmp_path / "sample_test"
+    # A legacy/stale authored value should simply be overridden by the arm.
+    _write(
+        sample_dir / "sample.toml",
+        """
+        [sample]
+        data_source = "simulation"
+        project = "chromatin"
+        """,
+    )
+    loc = _sample_loc(sample_dir, data_source=DataSource.experimental)
+    result = assemble_sample(loc)
+
+    # The dropped mismatch-warning feature must not resurface.
+    assert not any(
+        w.category == "data_source_mismatch" for w in result.warnings
+    )
+    # Directory won: the record reflects experimental.
+    assert result.record is not None
+    assert result.record.sample.data_source == DataSource.experimental
+
+
+def test_deprecated_md_run_block_warning(tmp_path):
+    """A stale [[md_run]] array in sample.toml is ignored with a warning."""
+    sample_dir = tmp_path / "sample_sim"
+    _write(
+        sample_dir / "sample.toml",
+        """
+        [sample]
+        data_source = "simulation"
+        project = "chromatin"
+
+        [[md_run]]
+        id = "legacy_run"
+        seed = 1
+        """,
+    )
+    loc = _sample_loc(
+        sample_dir,
+        data_source=DataSource.simulation,
+        dataset_type=DatasetType.bulk,
+    )
+    result = assemble_sample(loc)
+
+    deprecated = [
+        w for w in result.warnings if w.category == "deprecated_md_run_block"
+    ]
+    assert len(deprecated) == 1
+    # The stale block is ignored: no md_run rows from sample.toml.
+    assert result.record is not None
+    assert result.record.md_run == []
+
+
+def test_dangling_md_source_ref_warning(tmp_path):
+    """An md_source ref with no matching MdRuns/ folder warns rather than
+    failing the acquisition; the acquisition is still kept."""
+    sample_dir = tmp_path / "sample_sim"
+    _write(
+        sample_dir / "sample.toml",
+        """
+        [sample]
+        data_source = "simulation"
+        project = "chromatin"
+        """,
+    )
+    _write(
+        sample_dir / "SyntheticCryoET" / "acq1" / "acquisition.toml",
+        """
+        [acquisition]
+
+        [md_source]
+        md_run_id = "ghost_run"
+        frame = 1
+        """,
+    )
+    loc = _sample_loc(
+        sample_dir,
+        data_source=DataSource.simulation,
+        dataset_type=DatasetType.bulk,
+    )
+    result = assemble_sample(loc)
+
+    dangling = [
+        w for w in result.warnings if w.category == "dangling_md_source_ref"
+    ]
+    assert len(dangling) == 1
+    assert "ghost_run" in dangling[0].message
+    # Acquisition still validates and is kept.
+    assert result.record is not None
+    assert "acq1" in result.record.acquisitions
+
+
+def test_multiple_tilt_series_warning(tmp_path):
+    """An acquisition with >1 tilt series emits a multiple_tilt_series warning."""
+    import catalog.assembler as assembler
+    from catalog.parsers.tilt_series import TiltSeriesParseResult
+    from schema import TiltSeries
+
+    sample_dir = tmp_path / "sample_test"
+    _write_minimal_sample_toml(sample_dir)
+    _write(
+        sample_dir / "Pos1" / "acquisition.toml",
+        """
+        [acquisition]
+        microscope = "Krios"
+        """,
+    )
+    # Need a Frames/ dir so the tilt_series assignment branch runs.
+    (sample_dir / "Pos1" / "Frames").mkdir(parents=True)
+
+    fake_result = TiltSeriesParseResult(
+        records=[
+            TiltSeries(tilt_series_id="ts_a"),
+            TiltSeries(tilt_series_id="ts_b"),
+        ],
+        collisions=[],
+        unreadable=[],
+    )
+    original = assembler.parse_tilt_series_dir
+    assembler.parse_tilt_series_dir = lambda _path, **_kw: fake_result
+    try:
+        result = assemble_sample(_sample_loc(sample_dir))
+    finally:
+        assembler.parse_tilt_series_dir = original
+
+    multi = [w for w in result.warnings if w.category == "multiple_tilt_series"]
+    assert len(multi) == 1
+    assert multi[0].location == "acquisitions.Pos1"

@@ -1,0 +1,34 @@
+#:schema file:///groups/cryoet/cryoet/data/scratch/src/schema/md_run.schema.json
+# md_run.toml — researcher-authored MD-run metadata (simulation data only).
+# One file per MD run, placed at the root of each MD-run directory:
+#   {sample_dir}/MdRuns/{md_run_id}/md_run.toml
+#
+# The MdRuns/{md_run_id}/ directory name IS the run's identity — there is no
+# `id` field here. The validator injects it from the folder name at load time.
+#
+# HOW TO USE THIS TEMPLATE
+# ────────────────────────
+# 1. Copy this file to {sample_dir}/MdRuns/{md_run_id}/md_run.toml, naming the
+#    MdRuns/ subdirectory with the run's id.
+# 2. Uncomment and replace every "<FILL IN>" placeholder with its value.
+#    All fields are optional — delete any line you cannot fill in.
+#
+# EXTRA FIELDS
+# ────────────
+# You may add any key-value pair that is not yet in schema.py. The validator
+# reports it as a warning but the file still passes.
+#
+# VALIDATION
+# ──────────
+# Run from the sample root before committing:
+#   pixi run validate {sample_dir}
+
+# All keys are authored at the top level (no enclosing table) — the loader
+# injects `id` from the folder name and validates the whole file as an MdRun.
+
+# seed                = "<FILL IN>"   # integer, random seed for the run
+# sample_time         = "<FILL IN>"   # float, total simulated time
+# timestep            = "<FILL IN>"   # float, integration timestep
+# computer            = "<FILL IN>"   # text, name of the computer used
+# reference_contact   = "<FILL IN>"   # text, reference or contact for this run
+# force_field_version = "<FILL IN>"   # text, force field name/version

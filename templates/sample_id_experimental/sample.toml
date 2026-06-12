@@ -40,7 +40,6 @@
 
 [sample]
 lab_name        = "<FILL IN>"   # enum: collepardo | gouaux | rosen | villa
-data_source     = "<FILL IN>"   # enum: experimental | simulation
 project         = "<FILL IN>"   # enum: synapse | chromatin | nanogold
 # type          = "<FILL IN>"   # text, e.g. tissue | cellular | reconstituted
 # cell_type     = "<FILL IN>"   # text, required if type = "cellular"
@@ -65,21 +64,6 @@ project         = "<FILL IN>"   # enum: synapse | chromatin | nanogold
 # # For native substrates:
 # sequence_identity     = "<FILL IN>"   # text
 # nucleosome_footprint  = "<FILL IN>"   # list, list of ints
-
-
-# ── Simulation-specific  (uncomment only if data_source = "simulation") ──────
-
-# [simulation]
-# dataset_type = "<FILL IN>"   # text, e.g. single_molecule | slab | bulk
-
-
-# ── MD runs  (simulation data only; copy the block for each run) ─────────────
-# Each [[md_run]] id MUST match a directory under {sample_dir}/MdRuns/{id}.
-
-# [[md_run]]
-# id       = "<FILL IN>"   # text, MUST match a directory name under MdRuns/
-# seed     = "<FILL IN>"   # integer, RNG seed for the run
-# computer = "<FILL IN>"   # text, name of the computer used
 
 
 # ── Gold nanoparticle labeling (uncomment and fill in) ──────────

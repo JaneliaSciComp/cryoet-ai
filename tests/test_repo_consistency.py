@@ -29,6 +29,7 @@ from schema import (
     Simulation,
     TiltSeries,
 )
+from schema.schema import DatasetType, LabName
 from schema.sync_templates import TEMPLATE_PAIRS
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -141,23 +142,35 @@ def _enum_types_in(annotation) -> set[type]:
 
 
 def test_readme_enums_claim_holds():
-    """README states data_source/project are the only enums."""
+    """Guards the documented set of schema enums.
+
+    `data_source`, `project`, and `lab_name` are researcher-authored enums;
+    `dataset_type` is a scanner-derived enum (from the `MdSimulation/<SubDir>/`
+    directory). `docs/data_organization.md` describes the authored enums — if
+    this set drifts, update that doc.
+    """
     enums: set[type] = set()
     for model in _ENTITY_MODELS:
         for field in model.model_fields.values():
             enums |= _enum_types_in(field.annotation)
-    assert enums == {DataSource, Project}, (
-        "the set of enum types changed; README 'Schema rules' claims "
-        "data_source and project are the only enums. Update README.md. "
+    assert enums == {DataSource, DatasetType, LabName, Project}, (
+        "the set of enum types changed; docs/data_organization.md describes "
+        "data_source/project/lab_name (authored) and dataset_type (derived) as "
+        "the schema enums. Update the docs. "
         f"Found: {sorted(e.__name__ for e in enums)}"
     )
 
 
 def test_readme_required_fields_claim_holds():
-    """README states data_source/project are the only required sample fields."""
+    """Docs state `project` is the only required authored sample field.
+
+    `data_source` is directory-derived (Optional on the model, injected from
+    the top-level arm), so it is no longer a required authored field.
+    """
     required = {n for n, f in Sample.model_fields.items() if f.is_required()}
-    assert required == {"data_source", "project"}, (
-        "Sample's required fields changed; README 'Required fields' claims "
-        "only data_source and project are required. Update README.md. "
+    assert required == {"project"}, (
+        "Sample's required fields changed; docs/data_organization.md claims "
+        "only `project` is a required authored field (`data_source` is "
+        "directory-derived). Update the docs. "
         f"Found: {sorted(required)}"
     )

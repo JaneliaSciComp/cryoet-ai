@@ -2,7 +2,7 @@
 
 Covers every field in docs/schema.md. Fields are grouped by authoritative source within each class:
 
-- sample.toml / acquisition.toml — researcher-authored; required on ingest only for ``sample.data_source`` and ``sample.project``.
+- sample.toml / acquisition.toml — researcher-authored; required on ingest only for ``sample.project`` (``sample.data_source`` is directory-derived, not authored).
 - MDOC — parsed from ``.mdoc`` files under each acquisition's ``Frames/``.
 - MRC header — read from tomogram ``.mrc`` headers.
 - OME-Zarr .zattrs — read from multiscale ``.ome.zarr`` arrays.
@@ -130,12 +130,32 @@ class Project(str, Enum):
     nanogold = "nanogold"
 
 
+class DatasetType(str, Enum):
+    bulk = "bulk"
+    chromatin_fiber = "chromatin_fiber"
+    single_molecule = "single_molecule"
+    slab = "slab"
+
+
+# Tilt-series quality score: a constrained 1-5 integer (5 Excellent … 1 Low).
+# The 5->1 rubric is documentation-only (template comment + docs/schema.md);
+# the schema enforces only the integer range. A constrained int (not an
+# IntEnum) so the ORM maps it to Integer (see tests/catalog/test_orm_drift.py).
+TiltQuality = Annotated[int, Field(ge=1, le=5)]
+
+
 class Sample(_Base):
     # directory (sample folder name, injected on load)
     sample_id: IdStr | None = None
+    # directory (top-level arm: Experimental/ -> experimental,
+    # MdSimulation/<SubDir>/ -> simulation). Derived from the path by the
+    # scanner / loader (infer_arm) and no longer authored in sample.toml;
+    # Optional so a flat/legacy dir validated outside the arm layout still
+    # loads. NOT NULL in the DB (always set on the scan path).
+    data_source: DataSource | None = None
     # sample.toml ([sample])
-    data_source: DataSource
     project: Project
+    lab_name: LabName | None = None
     type: str | None = None
     cell_type: str | None = None
     description: str | None = None
@@ -146,7 +166,9 @@ class Sample(_Base):
 
 
 class Simulation(_Base):
-    dataset_type: str | None = None
+    # Derived from the top-level directory (MdSimulation/<SubDir>/) by the
+    # scanner / loader's infer_arm; no longer researcher-authored.
+    dataset_type: DatasetType | None = None
 
 
 class Chromatin(_Base):
@@ -203,11 +225,16 @@ class Milling(_Base):
 
 
 class MdRun(_Base):
-    # directory / sample.toml [[md_run]] (folder name = md_run_id = TOML `id`);
-    # one directory per run under {sample_dir}/MdRuns/{id}. Simulation data only.
+    # directory (folder name = md_run_id); one md_run.toml per run under
+    # {sample_dir}/MdRuns/{id}/md_run.toml. The `id` is injected from the
+    # folder name by the loader, not authored in TOML. Simulation data only.
     md_run_id: IdStr = Field(alias="id")
     seed: int | None = None
+    sample_time: float | None = None       # total simulated time
+    timestep: float | None = None          # integration timestep
     computer: str | None = None
+    reference_contact: str | None = None   # "reference or contact"
+    force_field_version: str | None = None
 
 
 class Acquisition(_Base):
@@ -220,7 +247,8 @@ class Acquisition(_Base):
     energy_filter: str | None = None
     phase_plate: bool | None = None
     microscope: str | None = None
-    quality: str | None = None
+    facility: str | None = None              # imaging facility, e.g. "Janelia"
+    tilt_series_quality_score: TiltQuality | None = None  # 1-5 rubric (5 best)
     # MDOC
     pixel_size: float | None = None          # angstrom
     dose_per_tilt: list[float] | None = None # e/Å² per tilt
@@ -408,7 +436,6 @@ class SampleRecord(_Base):
     """
 
     sample: Sample
-    lab_name: LabName | None = None
     simulation: Simulation | None = None
     chromatin: Chromatin | None = None
     label: list[Label] = Field(default_factory=list)

@@ -55,6 +55,10 @@ TEMPLATE_PAIRS: list[tuple[Path, Path]] = [
         _TEMPLATES / "acquisition.toml",
         _TEMPLATES / "sample_id_simulation" / "SyntheticCryoET" / "acquisition_id" / "acquisition.toml",
     ),
+    (
+        _TEMPLATES / "md_run.toml",
+        _TEMPLATES / "sample_id_simulation" / "MdRuns" / "md_run_id" / "md_run.toml",
+    ),
 ]
 
 

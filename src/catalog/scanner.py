@@ -29,6 +29,8 @@ class ScanReport:
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
     warnings: list[ScanWarning] = field(default_factory=list)
+    # Run-level warnings not tied to a sample (e.g. unknown MdSimulation subdir).
+    run_warnings: list[ScanWarning] = field(default_factory=list)
     conflicts: list[FieldConflict] = field(default_factory=list)
     soft_deleted: int = 0
     # populated only on prune_dry_run=True
@@ -105,6 +107,45 @@ def scan_root(
                 report.failed_samples.append((sample_loc.sample_id, str(e)))
                 if on_error == "raise":
                     raise
+
+        # Run-level warnings: subdirs under MdSimulation/ that aren't one of
+        # the four dataset-type dirs hold no cataloguable sample and were
+        # skipped by discovery. Surface them so operators see misplaced data.
+        run_warnings = [
+            ScanWarning(
+                category="unknown_md_simulation_subdir",
+                location=str(subdir),
+                message=(
+                    f"'{subdir.name}' is not a recognized MdSimulation "
+                    "dataset-type directory (expected one of Bulk, "
+                    "ChromatinFiber, SingleMolecule, Slab); any samples under "
+                    "it were skipped."
+                ),
+            )
+            for subdir in discovery.iter_unknown_md_subdirs(root)
+        ]
+        # Samples placed outside the two recognized top-level arms
+        # (root/{other}/{sample}/sample.toml) are never discovered and never
+        # catalogued. Surface each so operators can move it under Experimental/
+        # or MdSimulation/.
+        run_warnings.extend(
+            ScanWarning(
+                category="sample_outside_arm",
+                location=str(sample_dir),
+                message=(
+                    f"sample '{sample_dir.name}' is not under a recognized "
+                    "top-level arm (expected Experimental/ or MdSimulation/); "
+                    "it was skipped and not catalogued."
+                ),
+            )
+            for sample_dir in discovery.iter_misplaced_samples(root)
+        )
+        if run_warnings:
+            report.run_warnings.extend(run_warnings)
+            with session.begin():
+                persistence.persist_run_warnings(
+                    session, scan_run_id, run_warnings
+                )
 
         # After the loop: optional prune
         if prune or prune_dry_run:

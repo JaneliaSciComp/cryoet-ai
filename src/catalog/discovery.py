@@ -12,6 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
+from schema.schema import DataSource, DatasetType
+from schema.layout import (
+    DATASET_TYPE_BY_DIR,
+    TOP_LEVEL_EXPERIMENTAL,
+    TOP_LEVEL_MD_SIMULATION,
+    infer_arm,
+)
+
 ANNOTATION_FILE_EXTENSIONS = frozenset(
     {".star", ".mrc", ".png", ".tiff", ".tif", ".csv", ".json"}
 )
@@ -24,6 +32,15 @@ class SampleLocation:
     path: Path
     sample_id: str
     sample_toml: Path
+    data_source: DataSource
+    dataset_type: DatasetType | None
+
+
+@dataclass(frozen=True)
+class MdRunLocation:
+    path: Path
+    md_run_id: str
+    md_run_toml: Path
 
 
 @dataclass(frozen=True)
@@ -83,29 +100,161 @@ def dir_size_bytes(path: Path) -> int:
     return total
 
 
+def _sample_location(sample_dir: Path) -> SampleLocation | None:
+    """Build a SampleLocation for ``sample_dir`` if it holds a ``sample.toml``.
+
+    The arm (data_source / dataset_type) is derived from the directory's
+    ancestry via ``infer_arm``; returns ``None`` if there is no sample.toml.
+    """
+    sample_toml = sample_dir / "sample.toml"
+    if not sample_toml.is_file():
+        return None
+    data_source, dataset_type = infer_arm(sample_dir)
+    # infer_arm only returns None for paths outside the two-arm layout; the
+    # walkers below only call this with a sample dir under a known arm, so
+    # data_source is always set here. Guard defensively all the same.
+    if data_source is None:
+        return None
+    return SampleLocation(
+        path=sample_dir,
+        sample_id=sample_dir.name,
+        sample_toml=sample_toml,
+        data_source=data_source,
+        dataset_type=dataset_type,
+    )
+
+
 def iter_samples(root: Path) -> Iterator[SampleLocation]:
-    """Yield SampleLocation for any direct child of ``root`` containing ``sample.toml``."""
+    """Yield SampleLocation for every sample under the two-arm layout.
+
+    - ``root/Experimental/*/sample.toml``        -> (experimental, None)
+    - ``root/MdSimulation/{Bulk,ChromatinFiber,SingleMolecule,Slab}/*/sample.toml``
+      -> (simulation, <dataset_type>)
+
+    A missing ``Experimental/`` or ``MdSimulation/`` arm simply yields nothing
+    for that arm. Unknown subdirectories directly under ``MdSimulation/`` (not
+    one of the four dataset-type dirs) are skipped here — they hold no
+    cataloguable sample under a known arm. The scanner surfaces them separately
+    as run-level warnings via ``iter_unknown_md_subdirs``; this generator stays
+    pure and only yields valid sample locations.
+    """
     if not root.is_dir():
         return
-    for child in sorted(root.iterdir()):
+
+    # Experimental arm: direct children of Experimental/ with a sample.toml.
+    experimental_root = root / TOP_LEVEL_EXPERIMENTAL
+    if experimental_root.is_dir():
+        for child in sorted(experimental_root.iterdir()):
+            if not child.is_dir():
+                continue
+            loc = _sample_location(child)
+            if loc is not None:
+                yield loc
+
+    # MdSimulation arm: root/MdSimulation/<SubDir>/<sample>/sample.toml, where
+    # <SubDir> is one of the four known dataset-type dirs. Unknown subdirs skip.
+    md_root = root / TOP_LEVEL_MD_SIMULATION
+    if md_root.is_dir():
+        for sub in sorted(md_root.iterdir()):
+            if not sub.is_dir():
+                continue
+            if sub.name not in DATASET_TYPE_BY_DIR:
+                # Unknown MdSimulation subdir — skip (no warning channel here).
+                continue
+            for child in sorted(sub.iterdir()):
+                if not child.is_dir():
+                    continue
+                loc = _sample_location(child)
+                if loc is not None:
+                    yield loc
+
+
+def iter_unknown_md_subdirs(root: Path) -> Iterator[Path]:
+    """Yield each directory under ``root/MdSimulation/`` that is NOT one of the
+    four known dataset-type dirs (``Bulk`` / ``ChromatinFiber`` /
+    ``SingleMolecule`` / ``Slab``).
+
+    These are the subdirs ``iter_samples`` skips: a simulation sample dropped
+    under, say, ``MdSimulation/Foo/`` never gets a ``dataset_type`` and never
+    becomes a SampleLocation. Pure path-walking — the scanner turns each result
+    into a run-level ScanWarning so operators see the misplaced data.
+    """
+    md_root = root / TOP_LEVEL_MD_SIMULATION
+    if not md_root.is_dir():
+        return
+    for sub in sorted(md_root.iterdir()):
+        if sub.is_dir() and sub.name not in DATASET_TYPE_BY_DIR:
+            yield sub
+
+
+def iter_misplaced_samples(root: Path) -> Iterator[Path]:
+    """Yield each sample dir (holds a ``sample.toml``) that sits under a
+    top-level directory other than the two recognized arms.
+
+    The canonical layout puts every sample under a known top-level arm
+    (``Experimental/{sample}`` or ``MdSimulation/{SubDir}/{sample}``). A sample
+    dropped under any *other* top-level directory
+    (``root/{other}/{sample}/sample.toml``) is never reached by
+    ``iter_samples`` and would silently vanish from the catalog. This generator
+    finds those so the scanner can surface a run-level warning. A ``sample.toml``
+    sitting directly in such a top-level dir (``root/{other}/sample.toml``) is
+    reported too. Pure path-walking; descends at most one level below each
+    non-arm top-level dir.
+    """
+    if not root.is_dir():
+        return
+    for top in sorted(root.iterdir()):
+        if not top.is_dir():
+            continue
+        if top.name in (TOP_LEVEL_EXPERIMENTAL, TOP_LEVEL_MD_SIMULATION):
+            continue
+        # A sample dropped directly under the non-arm dir.
+        if (top / "sample.toml").is_file():
+            yield top
+            continue
+        # ... or one level down: root/{other}/{sample}/sample.toml.
+        for child in sorted(top.iterdir()):
+            if child.is_dir() and (child / "sample.toml").is_file():
+                yield child
+
+
+def iter_md_runs(sample: SampleLocation) -> Iterator[MdRunLocation]:
+    """Yield one MdRunLocation per ``{sample}/MdRuns/*/`` holding an md_run.toml.
+
+    The folder name is the ``md_run_id`` (the TOML ``id`` is injected from it
+    by the loader). Folders without an ``md_run.toml`` are skipped.
+    """
+    md_runs_dir = sample.path / "MdRuns"
+    if not md_runs_dir.is_dir():
+        return
+    for child in sorted(md_runs_dir.iterdir()):
         if not child.is_dir():
             continue
-        sample_toml = child / "sample.toml"
-        if sample_toml.is_file():
-            yield SampleLocation(
+        md_run_toml = child / "md_run.toml"
+        if md_run_toml.is_file():
+            yield MdRunLocation(
                 path=child,
-                sample_id=child.name,
-                sample_toml=sample_toml,
+                md_run_id=child.name,
+                md_run_toml=md_run_toml,
             )
 
 
 def iter_acquisitions(sample: SampleLocation) -> Iterator[AcquisitionLocation]:
-    """Yield AcquisitionLocation for any direct child of the sample dir that has
-    either an ``acquisition.toml`` OR a ``Frames/`` subdirectory.
+    """Yield AcquisitionLocation for each acquisition under the sample.
+
+    For simulation samples the acquisitions are nested one level deeper, under
+    ``{sample}/SyntheticCryoET/{acq}/`` (matching the loader's glob); for
+    experimental samples they are direct children of the sample dir. In either
+    case an acquisition dir qualifies if it has an ``acquisition.toml`` OR a
+    ``Frames/`` subdirectory.
     """
-    if not sample.path.is_dir():
+    if sample.data_source == DataSource.simulation:
+        acq_root = sample.path / "SyntheticCryoET"
+    else:
+        acq_root = sample.path
+    if not acq_root.is_dir():
         return
-    for child in sorted(sample.path.iterdir()):
+    for child in sorted(acq_root.iterdir()):
         if not child.is_dir():
             continue
         acq_toml = child / "acquisition.toml"
@@ -197,6 +346,10 @@ def parse_targets_for_sample(sample: SampleLocation) -> list[Path]:
     """
     targets: set[Path] = set()
     targets.add(sample.sample_toml)
+
+    # MD-run metadata: each MdRuns/*/md_run.toml so mtime gating reacts to edits.
+    for md_run in iter_md_runs(sample):
+        targets.add(md_run.md_run_toml)
 
     for acq in iter_acquisitions(sample):
         if acq.acquisition_toml is not None:

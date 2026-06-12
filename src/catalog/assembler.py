@@ -51,6 +51,11 @@ ScanWarningCategory = Literal[
     "tilt_series_layout_unknown",
     "undeclared_tomogram_folder",
     "undeclared_annotation_folder",
+    "deprecated_md_run_block",
+    "multiple_tilt_series",
+    "dangling_md_source_ref",
+    # Run-level (no owning sample) — emitted by the scanner, not the assembler.
+    "unknown_md_simulation_subdir",
 ]
 
 
@@ -98,6 +103,17 @@ def _categorize_loader_warning(s: str) -> ScanWarning:
 
     Anything else falls through to ``extra_field`` with ``<unknown>`` location.
     """
+    if s.startswith("[[md_run]] in sample.toml is deprecated"):
+        return ScanWarning(
+            category="deprecated_md_run_block", location="<root>", message=s
+        )
+    if s.startswith("dangling md_source ref:"):
+        # Format includes "md_source.md_run_id '<id>' ..." — surface the id.
+        m = re.search(r"md_run_id '([^']+)'", s)
+        location = f"md_source.{m.group(1)}" if m else "<root>"
+        return ScanWarning(
+            category="dangling_md_source_ref", location=location, message=s
+        )
     if "possible typo" in s:
         m = _TYPO_LOC_RE.search(s)
         location = m.group(1) if m else "<root>"
@@ -142,7 +158,11 @@ def assemble_sample(sample_loc: SampleLocation) -> AssemblyResult:
     result = AssemblyResult(record=None)
 
     # ── Step 1: TOML ─────────────────────────────────────────────────────────
-    load = load_sample_toml(sample_loc.path)
+    load = load_sample_toml(
+        sample_loc.path,
+        data_source=sample_loc.data_source,
+        dataset_type=sample_loc.dataset_type,
+    )
 
     for w in load.warnings:
         result.warnings.append(_categorize_loader_warning(w))
@@ -294,6 +314,19 @@ def assemble_sample(sample_loc: SampleLocation) -> AssemblyResult:
             # Replace any TOML-authored tilt_series list with the parser's
             # output — the scanner is the canonical writer for this field.
             acq_file.tilt_series = ts_result.records
+            if len(ts_result.records) > 1:
+                result.warnings.append(
+                    ScanWarning(
+                        category="multiple_tilt_series",
+                        location=f"acquisitions.{acq_loc.acquisition_id}",
+                        message=(
+                            f"acquisition '{acq_loc.acquisition_id}' has "
+                            f"{len(ts_result.records)} tilt series; the "
+                            "tilt_series_quality_score on [acquisition] applies "
+                            "to the acquisition as a whole"
+                        ),
+                    )
+                )
 
         # Step 3: tomograms (raw + post share one id namespace) -------------
         existing_tomos: dict[str, RawTomogram | PostProcessedTomogram] = {}

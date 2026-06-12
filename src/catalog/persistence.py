@@ -382,6 +382,35 @@ def upsert_sample_record(
         )
 
 
+def persist_run_warnings(
+    session: Session,
+    scan_run_id: str,
+    warnings: list[ScanWarning],
+) -> None:
+    """Refresh ``scan_run_warnings`` for ``scan_run_id``: DELETE then INSERT.
+
+    Run-level warnings have no owning sample, so they live in their own table
+    keyed by ``scan_run_id`` (not ``sample_id``). Deleting first makes a re-run
+    with the same id idempotent. ``detected_at`` is stamped at insert time.
+    """
+    now = time.time()
+    session.execute(
+        delete(orm.ScanRunWarningsORM).where(
+            orm.ScanRunWarningsORM.scan_run_id == scan_run_id
+        )
+    )
+    for w in warnings:
+        session.add(
+            orm.ScanRunWarningsORM(
+                category=w.category,
+                location=w.location,
+                message=w.message,
+                detected_at=now,
+                scan_run_id=scan_run_id,
+            )
+        )
+
+
 # ─── soft delete + safety floor ──────────────────────────────────────────────
 
 

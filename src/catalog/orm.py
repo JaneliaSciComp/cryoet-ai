@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from schema.schema import _ID_MAX_LEN, DataSource, Project
+from schema.schema import _ID_MAX_LEN, DataSource, DatasetType, LabName, Project
 
 
 class Base(DeclarativeBase):
@@ -43,6 +43,7 @@ class SampleORM(Base):
     sample_id: Mapped[str] = mapped_column(String(_ID_MAX_LEN), primary_key=True)
     data_source: Mapped[DataSource] = mapped_column(SAEnum(DataSource), nullable=False)
     project: Mapped[Project] = mapped_column(SAEnum(Project), nullable=False)
+    lab_name: Mapped[LabName | None] = mapped_column(SAEnum(LabName), nullable=True)
     type: Mapped[str | None] = mapped_column(String, nullable=True)
     cell_type: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -140,7 +141,9 @@ class SimulationORM(Base):
         ForeignKey("samples.sample_id"),
         primary_key=True,
     )
-    dataset_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    dataset_type: Mapped[DatasetType | None] = mapped_column(
+        SAEnum(DatasetType), nullable=True
+    )
 
 
 class FreezingORM(Base):
@@ -188,7 +191,11 @@ class MdRunORM(Base):
     )
     md_run_id: Mapped[str] = mapped_column(String(_ID_MAX_LEN), nullable=False)
     seed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sample_time: Mapped[float | None] = mapped_column(Float, nullable=True)
+    timestep: Mapped[float | None] = mapped_column(Float, nullable=True)
     computer: Mapped[str | None] = mapped_column(String, nullable=True)
+    reference_contact: Mapped[str | None] = mapped_column(String, nullable=True)
+    force_field_version: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (PrimaryKeyConstraint("sample_id", "md_run_id"),)
 
@@ -213,7 +220,10 @@ class AcquisitionORM(Base):
     energy_filter: Mapped[str | None] = mapped_column(String, nullable=True)
     phase_plate: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     microscope: Mapped[str | None] = mapped_column(String, nullable=True)
-    quality: Mapped[str | None] = mapped_column(String, nullable=True)
+    facility: Mapped[str | None] = mapped_column(String, nullable=True)
+    tilt_series_quality_score: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
     pixel_size: Mapped[float | None] = mapped_column(Float, nullable=True)
     dose_per_tilt: Mapped[list | None] = mapped_column(JSON, nullable=True)
     total_dose: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -427,6 +437,30 @@ class ScanWarningsORM(Base):
         nullable=False,
         index=True,
     )
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    location: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[str] = mapped_column(String, nullable=False)
+    detected_at: Mapped[float] = mapped_column(Float, nullable=False)
+    scan_run_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("scans.scan_run_id"),
+        nullable=False,
+        index=True,
+    )
+
+
+class ScanRunWarningsORM(Base):
+    """Run-level warnings not tied to any sample.
+
+    Emitted for filesystem issues the per-sample pipeline can't represent —
+    e.g. an unknown subdirectory under ``MdSimulation/`` that holds no
+    cataloguable sample. No FK to ``samples`` (there is no sample); refreshed
+    per run by ``scan_run_id``.
+    """
+
+    __tablename__ = "scan_run_warnings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     category: Mapped[str] = mapped_column(String, nullable=False)
     location: Mapped[str] = mapped_column(String, nullable=False)
     message: Mapped[str] = mapped_column(String, nullable=False)

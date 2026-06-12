@@ -52,6 +52,11 @@ export function SamplesPortalTable(props: {
       { accessorKey: 'data_source', header: 'Data source' },
       { accessorKey: 'project', header: 'Project' },
       {
+        accessorKey: 'lab_name',
+        header: 'Lab',
+        Cell: ({ cell }) => dash(cell.getValue()),
+      },
+      {
         accessorKey: 'type',
         header: 'Type',
         Cell: ({ cell }) => dash(cell.getValue()),

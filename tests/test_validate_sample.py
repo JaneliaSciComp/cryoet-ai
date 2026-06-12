@@ -8,6 +8,7 @@ from textwrap import dedent
 import pytest
 
 from schema.loader import load_sample_record
+from schema.schema import DataSource
 from schema.validate import main
 
 
@@ -461,16 +462,22 @@ def test_annotation_id_without_matching_folder_fails(tmp_path):
 
 
 def test_md_source_valid_reference(tmp_path):
-    """A simulation acquisition referencing a declared md_run validates clean."""
+    """A simulation acquisition referencing a declared md_run validates clean.
+
+    MD runs are now authored as ``MdRuns/{id}/md_run.toml`` (the folder name is
+    the id); the ``[[md_run]]`` block in sample.toml is deprecated.
+    """
     _write(
         tmp_path / "sample.toml",
         """
         [sample]
         data_source = "simulation"
         project = "chromatin"
-
-        [[md_run]]
-        id = "run_a"
+        """,
+    )
+    _write(
+        tmp_path / "MdRuns" / "run_a" / "md_run.toml",
+        """
         seed = 42
         computer = "gpu01"
         """,
@@ -485,28 +492,28 @@ def test_md_source_valid_reference(tmp_path):
         frame = 1500
         """,
     )
-    result = load_sample_record(tmp_path)
+    result = load_sample_record(tmp_path, data_source=DataSource.simulation)
     assert result.sample_errors == []
     assert result.acquisition_errors == {}
     assert result.record is not None
+    assert {r.md_run_id for r in result.record.md_run} == {"run_a"}
     acq = result.record.acquisitions["acq1"]
     assert acq.md_source.md_run_id == "run_a"
     assert acq.md_source.frame == 1500
 
 
-def test_md_source_dangling_md_run_id_isolates(tmp_path):
-    """A dangling md_run_id fails only that acquisition, not the whole sample."""
+def test_md_source_dangling_md_run_id_warns(tmp_path):
+    """A dangling md_run_id (no MdRuns/ folder) now WARNS rather than failing
+    the acquisition — the acquisition is still kept (plan §4.4)."""
     _write(
         tmp_path / "sample.toml",
         """
         [sample]
         data_source = "simulation"
         project = "chromatin"
-
-        [[md_run]]
-        id = "run_a"
         """,
     )
+    _write(tmp_path / "MdRuns" / "run_a" / "md_run.toml", "seed = 1\n")
     _write(
         tmp_path / "SyntheticCryoET" / "acq_good" / "acquisition.toml",
         """
@@ -527,19 +534,23 @@ def test_md_source_dangling_md_run_id_isolates(tmp_path):
         frame = 2
         """,
     )
-    result = load_sample_record(tmp_path)
-    # Sample still loads; only the bad acquisition is excluded (isolation).
+    result = load_sample_record(tmp_path, data_source=DataSource.simulation)
+    # Both acquisitions are kept; the dangling ref only warns.
     assert result.record is not None
     assert result.sample_errors == []
     assert "acq_good" in result.record.acquisitions
-    assert "acq_bad" not in result.record.acquisitions
-    assert "acq_bad" in result.acquisition_errors
-    assert "ghost" in result.acquisition_errors["acq_bad"]
-    assert "md_run" in result.acquisition_errors["acq_bad"]
+    assert "acq_bad" in result.record.acquisitions
+    assert "acq_bad" not in result.acquisition_errors
+    dangling = [
+        w for w in result.warnings if w.startswith("dangling md_source ref:")
+    ]
+    assert len(dangling) == 1
+    assert "ghost" in dangling[0]
 
 
-def test_md_run_on_experimental_rejected(tmp_path):
-    """[[md_run]] on an experimental sample fails the whole sample."""
+def test_deprecated_md_run_block_in_sample_toml_ignored(tmp_path):
+    """A stale [[md_run]] array in sample.toml is ignored with a warning (no
+    longer a category error on experimental samples)."""
     _write(
         tmp_path / "sample.toml",
         """
@@ -552,8 +563,13 @@ def test_md_run_on_experimental_rejected(tmp_path):
         """,
     )
     result = load_sample_record(tmp_path)
-    assert result.record is None
-    assert any("md_run" in e and "experimental" in e for e in result.sample_errors)
+    # The block is ignored, so the experimental sample still validates clean.
+    assert result.record is not None
+    assert result.record.md_run == []
+    assert any(
+        w.startswith("[[md_run]] in sample.toml is deprecated")
+        for w in result.warnings
+    )
 
 
 def test_md_source_on_experimental_rejected(tmp_path):

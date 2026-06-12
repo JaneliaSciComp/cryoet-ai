@@ -6,12 +6,17 @@ from pathlib import Path
 
 import pytest
 
+from schema.schema import DataSource, DatasetType
+
 from catalog.discovery import (
     dir_size_bytes,
     iter_acquisitions,
     iter_annotations,
+    iter_md_runs,
+    iter_misplaced_samples,
     iter_samples,
     iter_tomograms,
+    iter_unknown_md_subdirs,
     parse_targets_for_sample,
 )
 
@@ -29,14 +34,131 @@ def test_iter_samples_finds_chromatin_and_simulation():
     assert chrom.path.is_dir()
 
 
+def test_iter_samples_assigns_arm_from_directory():
+    samples = {s.sample_id: s for s in iter_samples(FIXTURES)}
+    chrom = samples["sample_chromatin"]
+    assert chrom.data_source == DataSource.experimental
+    assert chrom.dataset_type is None
+    sim = samples["sample_simulation"]
+    assert sim.data_source == DataSource.simulation
+    assert sim.dataset_type == DatasetType.single_molecule
+
+
+def test_iter_samples_skips_unknown_mdsimulation_subdir(tmp_path):
+    # A subdir under MdSimulation/ that isn't one of the four dataset-type dirs
+    # is skipped silently.
+    bogus = tmp_path / "MdSimulation" / "NotADatasetType" / "s1"
+    bogus.mkdir(parents=True)
+    (bogus / "sample.toml").write_text(
+        '[sample]\ndata_source = "simulation"\nproject = "chromatin"\n'
+    )
+    good = tmp_path / "MdSimulation" / "Bulk" / "s2"
+    good.mkdir(parents=True)
+    (good / "sample.toml").write_text(
+        '[sample]\ndata_source = "simulation"\nproject = "chromatin"\n'
+    )
+    found = list(iter_samples(tmp_path))
+    assert {s.sample_id for s in found} == {"s2"}
+    assert found[0].dataset_type == DatasetType.bulk
+
+
+def test_iter_unknown_md_subdirs_yields_only_unrecognized(tmp_path):
+    # Two known dataset-type dirs plus one bogus subdir; only the bogus one
+    # should be surfaced (the known dirs hold real samples).
+    for name in ("Bulk", "ChromatinFiber", "NotADatasetType"):
+        (tmp_path / "MdSimulation" / name).mkdir(parents=True)
+    unknown = list(iter_unknown_md_subdirs(tmp_path))
+    assert [p.name for p in unknown] == ["NotADatasetType"]
+
+
+def test_iter_unknown_md_subdirs_empty_without_arm(tmp_path):
+    # No MdSimulation/ arm at all -> nothing to warn about.
+    (tmp_path / "Experimental").mkdir()
+    assert list(iter_unknown_md_subdirs(tmp_path)) == []
+
+
+def test_iter_unknown_md_subdirs_ignores_files(tmp_path):
+    # A stray file directly under MdSimulation/ is not a subdir warning.
+    md = tmp_path / "MdSimulation"
+    md.mkdir()
+    (md / "README.txt").write_text("notes")
+    assert list(iter_unknown_md_subdirs(tmp_path)) == []
+
+
+def _write_sample_toml(sample_dir: Path) -> None:
+    sample_dir.mkdir(parents=True)
+    (sample_dir / "sample.toml").write_text(
+        '[sample]\nproject = "chromatin"\n'
+    )
+
+
+def test_iter_misplaced_samples_finds_samples_under_wrong_top_dir(tmp_path):
+    # root/{other}/{sample}/sample.toml -> misplaced (other is not an arm).
+    _write_sample_toml(tmp_path / "Experiemntal" / "s1")  # typo'd arm
+    misplaced = list(iter_misplaced_samples(tmp_path))
+    assert [p.name for p in misplaced] == ["s1"]
+
+
+def test_iter_misplaced_samples_reports_sample_directly_under_top_dir(tmp_path):
+    # root/{other}/sample.toml -> the non-arm dir is itself the sample dir.
+    _write_sample_toml(tmp_path / "loose_sample")
+    misplaced = list(iter_misplaced_samples(tmp_path))
+    assert [p.name for p in misplaced] == ["loose_sample"]
+
+
+def test_iter_misplaced_samples_ignores_recognized_arms(tmp_path):
+    # Samples correctly under Experimental/ and MdSimulation/ are never flagged.
+    _write_sample_toml(tmp_path / "Experimental" / "s1")
+    _write_sample_toml(tmp_path / "MdSimulation" / "Bulk" / "s2")
+    assert list(iter_misplaced_samples(tmp_path)) == []
+
+
+def test_iter_misplaced_samples_ignores_dirs_without_sample_toml(tmp_path):
+    # A non-arm top-level dir with no sample.toml anywhere is not flagged.
+    (tmp_path / "scratch" / "subdir").mkdir(parents=True)
+    (tmp_path / "scratch" / "notes.txt").write_text("hi")
+    assert list(iter_misplaced_samples(tmp_path)) == []
+
+
+def test_iter_samples_tolerates_missing_arm(tmp_path):
+    # Only an Experimental/ arm present; MdSimulation/ absent.
+    exp = tmp_path / "Experimental" / "s1"
+    exp.mkdir(parents=True)
+    (exp / "sample.toml").write_text(
+        '[sample]\ndata_source = "experimental"\nproject = "chromatin"\n'
+    )
+    found = list(iter_samples(tmp_path))
+    assert {s.sample_id for s in found} == {"s1"}
+    assert found[0].data_source == DataSource.experimental
+
+
 def test_iter_samples_skips_dirs_without_sample_toml(tmp_path):
-    (tmp_path / "no_toml_here").mkdir()
-    (tmp_path / "with_toml").mkdir(exist_ok=True)
-    (tmp_path / "with_toml" / "sample.toml").write_text(
-        "[sample]\ndata_source='cryoet'\nproject='chromatin'\n"
+    exp = tmp_path / "Experimental"
+    exp.mkdir()
+    (exp / "no_toml_here").mkdir()
+    (exp / "with_toml").mkdir(exist_ok=True)
+    (exp / "with_toml" / "sample.toml").write_text(
+        '[sample]\ndata_source = "experimental"\nproject = "chromatin"\n'
     )
     found = list(iter_samples(tmp_path))
     assert {s.sample_id for s in found} == {"with_toml"}
+
+
+def test_iter_md_runs_finds_md_run_tomls():
+    sim = next(
+        s for s in iter_samples(FIXTURES) if s.sample_id == "sample_simulation"
+    )
+    runs = list(iter_md_runs(sim))
+    assert [r.md_run_id for r in runs] == ["run_001"]
+    assert runs[0].md_run_toml.is_file()
+    assert runs[0].md_run_toml.name == "md_run.toml"
+
+
+def test_iter_md_runs_empty_for_experimental():
+    chrom = next(
+        s for s in iter_samples(FIXTURES) if s.sample_id == "sample_chromatin"
+    )
+    assert list(iter_md_runs(chrom)) == []
 
 
 def test_iter_acquisitions_finds_toml_and_frames_only():
@@ -51,6 +173,21 @@ def test_iter_acquisitions_finds_toml_and_frames_only():
     assert pos86.frames_dir is not None
     assert pos86.tomograms_dir is not None
     assert pos86.annotations_dir is not None
+
+
+def test_iter_acquisitions_simulation_nested_under_synthetic():
+    """Simulation acquisitions live under SyntheticCryoET/<acq>/ (one level
+    deeper than experimental); the simulation-aware walk finds them."""
+    sim = next(
+        s for s in iter_samples(FIXTURES) if s.sample_id == "sample_simulation"
+    )
+    acqs = list(iter_acquisitions(sim))
+    assert [a.acquisition_id for a in acqs] == ["sim_acq_01"]
+    acq = acqs[0]
+    assert acq.acquisition_toml is not None and acq.acquisition_toml.is_file()
+    # The acquisition root sits under SyntheticCryoET/.
+    assert acq.path.parent.name == "SyntheticCryoET"
+    assert acq.annotations_dir is not None
 
 
 def test_iter_tomograms_lists_pipeline_folders():
@@ -106,6 +243,15 @@ def test_parse_targets_for_sample_includes_all_categories():
     # deterministic, unique
     assert sorted(targets, key=lambda p: str(p)) == targets
     assert len(set(targets)) == len(targets)
+
+
+def test_parse_targets_for_sample_includes_md_run_toml():
+    sim = next(
+        s for s in iter_samples(FIXTURES) if s.sample_id == "sample_simulation"
+    )
+    targets = parse_targets_for_sample(sim)
+    target_strs = {str(t) for t in targets}
+    assert any(t.endswith("MdRuns/run_001/md_run.toml") for t in target_strs)
 
 
 # ---------------------------------------------------------------------------

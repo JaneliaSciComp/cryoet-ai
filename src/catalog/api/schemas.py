@@ -17,6 +17,7 @@ from pydantic import BaseModel
 class SampleSummary(BaseModel):
     sample_id: str
     project: str
+    lab_name: str | None = None
     data_source: str
     type: str | None = None
     cell_type: str | None = None
@@ -95,6 +96,10 @@ class MdRunOut(BaseModel):
     md_run_id: str
     seed: int | None = None
     computer: str | None = None
+    sample_time: float | None = None
+    timestep: float | None = None
+    reference_contact: str | None = None
+    force_field_version: str | None = None
 
 
 class _TomogramOutBase(BaseModel):
@@ -160,7 +165,8 @@ class AcquisitionOut(BaseModel):
     acquisition_id: str
     resolution: float | None = None
     microscope: str | None = None
-    quality: str | None = None
+    facility: str | None = None
+    tilt_series_quality_score: int | None = None
     pixel_size: float | None = None
     voltage: float | None = None
     camera: str | None = None
@@ -175,6 +181,7 @@ class AcquisitionOut(BaseModel):
 class SampleDetail(BaseModel):
     sample_id: str
     project: str
+    lab_name: str | None = None
     data_source: str
     type: str | None = None
     cell_type: str | None = None
@@ -292,6 +299,18 @@ class SampleWarningsGroup(BaseModel):
 
     sample_id: str
     warnings: list[str]
+
+
+class RunWarningOut(BaseModel):
+    """A run-level warning not tied to any sample (e.g. an unknown subdir
+    under ``MdSimulation/``)."""
+
+    id: int
+    category: str
+    location: str
+    message: str
+    detected_at: float
+    scan_run_id: str
 
 
 class ExtrasSummaryRow(BaseModel):

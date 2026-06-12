@@ -1,17 +1,19 @@
-"""Regenerate schema.json + acquisition.schema.json from the Pydantic models.
+"""Regenerate schema.json + acquisition.schema.json + md_run.schema.json.
 
 Writes the JSON Schema for SampleRecord (the merged sample + acquisitions
-record) and AcquisitionFile (a single acquisition.toml on its own, used by
+record), AcquisitionFile (a single acquisition.toml on its own, used by
 editor LSPs to validate acquisition.toml without requiring the sample
-fields). Run whenever the Pydantic models change so downstream tools
-(non-Python validators, UIs, editor schema directives) stay in sync.
+fields), and MdRun (a single md_run.toml on its own). Run whenever the
+Pydantic models change so downstream tools (non-Python validators, UIs,
+editor schema directives) stay in sync.
 
 Usage:
     pixi run json-schema [output_path]
 
 `output_path` is the SampleRecord schema; the AcquisitionFile schema is
-written as `acquisition.schema.json` next to it. Defaults to
-<repo>/schema/schema.json when no path is given.
+written as `acquisition.schema.json` and the MdRun schema as
+`md_run.schema.json` next to it. Defaults to <repo>/schema/schema.json when
+no path is given.
 """
 
 from __future__ import annotations
@@ -21,11 +23,12 @@ import json
 import sys
 from pathlib import Path
 
-from schema import AcquisitionFile, SampleRecord
+from schema import AcquisitionFile, MdRun, SampleRecord
 
 
 _DEFAULT_OUT = Path(__file__).resolve().parent / "schema.json"
 _ACQUISITION_FILENAME = "acquisition.schema.json"
+_MD_RUN_FILENAME = "md_run.schema.json"
 _NULL_BRANCH = {"type": "null"}
 
 
@@ -81,6 +84,11 @@ def main(argv: list[str] | None = None) -> int:
     acquisition_schema = strip_nullable(AcquisitionFile.model_json_schema())
     acquisition_out.write_text(json.dumps(acquisition_schema, indent=2) + "\n")
     print(f"wrote {acquisition_out}")
+
+    md_run_out = args.output.parent / _MD_RUN_FILENAME
+    md_run_schema = strip_nullable(MdRun.model_json_schema())
+    md_run_out.write_text(json.dumps(md_run_schema, indent=2) + "\n")
+    print(f"wrote {md_run_out}")
     return 0
 
 

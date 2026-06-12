@@ -25,7 +25,7 @@ from schema import (
     Simulation,
 )
 from schema.loader import ExtrasEntry
-from schema.schema import DataSource, Project
+from schema.schema import DataSource, DatasetType, Project
 
 from catalog import db, orm
 from catalog.assembler import ScanWarning
@@ -340,8 +340,18 @@ def test_md_run_and_md_source_round_trip(session):
     )
     r = SampleRecord(
         sample=sample,
-        simulation=Simulation(dataset_type="test"),
-        md_run=[MdRun(id="run_a", seed=123, computer="dgx-01")],
+        simulation=Simulation(dataset_type=DatasetType.bulk),
+        md_run=[
+            MdRun(
+                id="run_a",
+                seed=123,
+                computer="dgx-01",
+                sample_time=100.0,
+                timestep=0.002,
+                reference_contact="Jane Researcher",
+                force_field_version="amber99sb-ildn",
+            )
+        ],
         acquisitions={"acq1": acq_file},
     )
     upsert_sample_record(
@@ -353,6 +363,16 @@ def test_md_run_and_md_source_round_trip(session):
     assert md_run_row is not None
     assert md_run_row.seed == 123
     assert md_run_row.computer == "dgx-01"
+    # New MdRun columns flow through model_dump + _filter_to_columns.
+    assert md_run_row.sample_time == pytest.approx(100.0)
+    assert md_run_row.timestep == pytest.approx(0.002)
+    assert md_run_row.reference_contact == "Jane Researcher"
+    assert md_run_row.force_field_version == "amber99sb-ildn"
+
+    # simulation.dataset_type round-trips as the enum value string.
+    sim_row = session.get(orm.SimulationORM, "sim1")
+    assert sim_row is not None
+    assert sim_row.dataset_type == "bulk"
 
     md_source_row = session.get(orm.MdSourceORM, ("sim1", "acq1"))
     assert md_source_row is not None
@@ -363,7 +383,7 @@ def test_md_run_and_md_source_round_trip(session):
     acq_file2 = AcquisitionFile(acquisition=Acquisition(acquisition_id="acq1"))
     r2 = SampleRecord(
         sample=sample,
-        simulation=Simulation(dataset_type="test"),
+        simulation=Simulation(dataset_type=DatasetType.bulk),
         md_run=r.md_run,
         acquisitions={"acq1": acq_file2},
     )
@@ -377,7 +397,7 @@ def test_md_run_and_md_source_round_trip(session):
     # Now drop md_run too.
     r3 = SampleRecord(
         sample=sample,
-        simulation=Simulation(dataset_type="test"),
+        simulation=Simulation(dataset_type=DatasetType.bulk),
         acquisitions={"acq1": acq_file2},
     )
     upsert_sample_record(
@@ -385,6 +405,37 @@ def test_md_run_and_md_source_round_trip(session):
     )
     session.commit()
     assert session.get(orm.MdRunORM, ("sim1", "run_a")) is None
+
+
+def test_upsert_acquisition_facility_and_tilt_quality(session):
+    """New Acquisition columns ``facility`` and ``tilt_series_quality_score``
+    flow through to the DB; the removed ``quality`` column is simply absent."""
+    acq_file = AcquisitionFile(
+        acquisition=Acquisition(
+            acquisition_id="acq1",
+            facility="Janelia",
+            tilt_series_quality_score=4,
+        ),
+    )
+    r = SampleRecord(
+        sample=Sample(
+            sample_id="s1",
+            data_source=DataSource.experimental,
+            project=Project.chromatin,
+        ),
+        acquisitions={"acq1": acq_file},
+    )
+    upsert_sample_record(
+        session, r, extras=[], warnings=[], scan_run_id="run-1"
+    )
+    session.commit()
+
+    row = session.get(orm.AcquisitionORM, ("s1", "acq1"))
+    assert row is not None
+    assert row.facility == "Janelia"
+    assert row.tilt_series_quality_score == 4
+    # The dropped ``quality`` column no longer exists on the ORM.
+    assert not hasattr(row, "quality")
 
 
 def test_stale_acquisition_cleaned_up(session):

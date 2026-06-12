@@ -27,12 +27,15 @@ def _session(engine):
 
 
 def _write_minimal_sample(parent: Path, sample_id: str) -> Path:
-    """Write the smallest legal sample.toml under ``parent / sample_id``.
+    """Write the smallest legal sample.toml under the Experimental arm of
+    ``parent`` (i.e. ``parent/Experimental/sample_id``).
 
-    Centralised so a schema rev to ``[sample]`` only touches one place.
+    Centralised so a schema rev to ``[sample]`` only touches one place. The
+    sample lives under ``Experimental/`` so the two-arm discovery walk finds it
+    and ``infer_arm`` assigns ``data_source=experimental``.
     """
-    d = parent / sample_id
-    d.mkdir()
+    d = parent / "Experimental" / sample_id
+    d.mkdir(parents=True)
     (d / "sample.toml").write_text(
         '[sample]\ndata_source = "experimental"\nproject = "chromatin"\n'
     )
@@ -142,7 +145,7 @@ def test_force_bypasses_gate(engine):
 
 def test_touched_file_triggers_reassemble(engine):
     scanner.scan_root(engine, FIXTURES)
-    target = FIXTURES / "sample_chromatin" / "sample.toml"
+    target = FIXTURES / "Experimental" / "sample_chromatin" / "sample.toml"
     original_mtime = target.stat().st_mtime
     new_mtime = original_mtime + 100
     os.utime(target, (new_mtime, new_mtime))
@@ -514,3 +517,78 @@ def test_skip_no_heal_when_file_present(engine, tmp_path):
 
     assert report.thumbnails_healed == 0
     mock_render.assert_not_called()
+
+
+def test_scan_emits_and_persists_run_level_warning(engine, tmp_path):
+    # A sample dropped under an unrecognized MdSimulation/ subdir is skipped by
+    # discovery; the scanner surfaces it as a run-level warning and persists it
+    # to scan_run_warnings (keyed by scan_run_id, no owning sample).
+    bogus = tmp_path / "MdSimulation" / "NotADatasetType" / "s1"
+    bogus.mkdir(parents=True)
+    (bogus / "sample.toml").write_text(
+        '[sample]\ndata_source = "simulation"\nproject = "chromatin"\n'
+    )
+    # A legitimate sample so the scan has real work too.
+    _write_minimal_sample(tmp_path, "exp1")
+
+    report = scanner.scan_root(engine, tmp_path)
+
+    # The bogus subdir never becomes a sample.
+    assert report.upserted == 1
+    assert [w.category for w in report.run_warnings] == [
+        "unknown_md_simulation_subdir"
+    ]
+    assert "NotADatasetType" in report.run_warnings[0].location
+
+    s = _session(engine)
+    try:
+        rows = s.execute(select(orm.ScanRunWarningsORM)).scalars().all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.category == "unknown_md_simulation_subdir"
+        assert "NotADatasetType" in row.location
+        # Tied to the scan run, not a sample.
+        scan_ids = {
+            r[0] for r in s.execute(select(orm.ScansORM.scan_run_id)).all()
+        }
+        assert row.scan_run_id in scan_ids
+    finally:
+        s.close()
+
+
+def test_scan_emits_run_warning_for_sample_outside_arm(engine, tmp_path):
+    # A sample placed under a non-arm top-level dir (root/{other}/{sample}/) is
+    # never discovered; the scanner surfaces and persists a run-level warning.
+    misplaced = tmp_path / "Experiemntal" / "s1"  # typo'd arm name
+    misplaced.mkdir(parents=True)
+    (misplaced / "sample.toml").write_text(
+        '[sample]\nproject = "chromatin"\n'
+    )
+    # A legitimate sample so the scan has real work too.
+    _write_minimal_sample(tmp_path, "exp1")
+
+    report = scanner.scan_root(engine, tmp_path)
+
+    # The misplaced sample never becomes a catalogued sample.
+    assert report.upserted == 1
+    assert [w.category for w in report.run_warnings] == ["sample_outside_arm"]
+    assert "s1" in report.run_warnings[0].location
+
+    s = _session(engine)
+    try:
+        rows = s.execute(select(orm.ScanRunWarningsORM)).scalars().all()
+        assert [r.category for r in rows] == ["sample_outside_arm"]
+        assert "s1" in rows[0].location
+    finally:
+        s.close()
+
+
+def test_scan_clean_root_has_no_run_warnings(engine):
+    report = scanner.scan_root(engine, FIXTURES)
+    assert report.run_warnings == []
+    s = _session(engine)
+    try:
+        rows = s.execute(select(orm.ScanRunWarningsORM)).scalars().all()
+        assert rows == []
+    finally:
+        s.close()

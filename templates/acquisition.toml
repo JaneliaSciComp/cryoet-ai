@@ -43,13 +43,19 @@
 # energy_filter = "<FILL IN>"   # text, model name, e.g. "Selectris", "GIF Quantum", "none"
 # phase_plate   = "<FILL IN>"   # boolean, true | false
 # microscope    = "<FILL IN>"   # text, model name, e.g. "Titan Krios", "Glacios"
-# quality       = "<FILL IN>"   # text, e.g., "high", "medium", "low"
+# facility      = "<FILL IN>"   # text, imaging facility, e.g. "Janelia"
+# tilt_series_quality_score = "<FILL IN>"   # integer 1-5 rubric:
+#                                           #   5 = Excellent, full tilt series is publication ready
+#                                           #   4 = Good, full tilt series is analysis ready
+#                                           #   3 = Fair, minor parts need to be or have been discarded prior to analysis
+#                                           #   2 = Poor, major parts need to be or have been discarded prior to analysis
+#                                           #   1 = Low, not useful for analysis
 
 # ── MD source  (simulation data only) ────────────────────────────────────────
 # Which MD run + frame this acquisition's synthetic data came from.
 
 # [md_source]
-# md_run_id = "<FILL IN>"   # text, MUST match an [[md_run]] id in sample.toml
+# md_run_id = "<FILL IN>"   # text, MUST match a MdRuns/{id}/ folder name (the md_run.toml id)
 # frame     = "<FILL IN>"   # integer, frame/snapshot index in the MD run
 
 # ════════════════════════════════════════════════════════════════

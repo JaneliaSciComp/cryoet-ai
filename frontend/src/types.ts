@@ -5,6 +5,7 @@
 export type SampleSummary = {
   sample_id: string
   project: string
+  lab_name: string | null
   data_source: string
   type: string | null
   cell_type: string | null
@@ -82,6 +83,10 @@ export type MdRunOut = {
   md_run_id: string
   seed: number | null
   computer: string | null
+  sample_time: number | null
+  timestep: number | null
+  reference_contact: string | null
+  force_field_version: string | null
 }
 
 // Fields shared between raw and post-processed tomogram outputs.
@@ -142,7 +147,8 @@ export type AcquisitionOut = {
   acquisition_id: string
   resolution: number | null
   microscope: string | null
-  quality: string | null
+  facility: string | null
+  tilt_series_quality_score: number | null
   pixel_size: number | null
   voltage: number | null
   camera: string | null
@@ -157,6 +163,7 @@ export type AcquisitionOut = {
 export type SampleDetail = {
   sample_id: string
   project: string
+  lab_name: string | null
   data_source: string
   type: string | null
   cell_type: string | null
@@ -267,4 +274,15 @@ export type ScanSampleOut = {
 export type SampleWarningsGroup = {
   sample_id: string
   warnings: string[]
+}
+
+// A run-level warning not tied to any sample (e.g. an unknown subdirectory
+// under MdSimulation/ that was skipped during discovery).
+export type RunWarningOut = {
+  id: number
+  category: string
+  location: string
+  message: string
+  detected_at: number
+  scan_run_id: string
 }

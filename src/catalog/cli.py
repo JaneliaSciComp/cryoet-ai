@@ -121,6 +121,10 @@ def _cmd_scan(args) -> int:
     if report.thumbnails_healed:
         print(f"thumbnails_healed: {report.thumbnails_healed}")
     print(f"warnings: {len(report.warnings)}")
+    if report.run_warnings:
+        print(f"run-level warnings: {len(report.run_warnings)}")
+        for w in report.run_warnings[:10]:
+            print(f"  {w.category}: {w.location}", file=sys.stderr)
     print(f"errors:   {len(report.errors)}")
     if report.conflicts:
         print(f"conflicts: {len(report.conflicts)}")

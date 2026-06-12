@@ -11,6 +11,7 @@ import {
 } from '~/utils/samplesSearch'
 import type {
   FiltersOptionsOut,
+  RunWarningOut,
   SampleDetail,
   SampleSummary,
   SampleWarningsGroup,
@@ -141,6 +142,19 @@ export function useScanWarningsQuery(scanId: string) {
   return useSuspenseQuery(scanWarningsQueryOptions(scanId))
 }
 
+export const scanRunWarningsQueryOptions = (scanId: string) =>
+  queryOptions({
+    queryKey: ['scans', 'detail', scanId, 'run-warnings'],
+    queryFn: () =>
+      apiFetch<RunWarningOut[]>(
+        `/scans/${encodeURIComponent(scanId)}/run-warnings`,
+      ),
+  })
+
+export function useScanRunWarningsQuery(scanId: string) {
+  return useSuspenseQuery(scanRunWarningsQueryOptions(scanId))
+}
+
 export const scanSamplesQueryOptions = (scanId: string, outcome: ScanOutcome) =>
   queryOptions({
     queryKey: ['scans', 'detail', scanId, 'samples', outcome],
@@ -183,6 +197,17 @@ export const latestScanWarningsQueryOptions = queryOptions({
 
 export function useLatestScanWarningsQuery() {
   return useSuspenseQuery(latestScanWarningsQueryOptions)
+}
+
+// ── /scans/latest/run-warnings (run-level, no sample) ─────────────────────────
+
+export const latestScanRunWarningsQueryOptions = queryOptions({
+  queryKey: ['scans', 'latest', 'run-warnings'],
+  queryFn: () => fetchOrEmpty<RunWarningOut>('/scans/latest/run-warnings'),
+})
+
+export function useLatestScanRunWarningsQuery() {
+  return useSuspenseQuery(latestScanRunWarningsQueryOptions)
 }
 
 // ── /scans/latest/samples?outcome= ───────────────────────────────────────────

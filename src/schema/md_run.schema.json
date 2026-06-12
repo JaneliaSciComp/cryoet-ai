@@ -1,0 +1,38 @@
+{
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "sample_time": {
+      "title": "Sample Time",
+      "type": "number"
+    },
+    "timestep": {
+      "title": "Timestep",
+      "type": "number"
+    },
+    "computer": {
+      "title": "Computer",
+      "type": "string"
+    },
+    "reference_contact": {
+      "title": "Reference Contact",
+      "type": "string"
+    },
+    "force_field_version": {
+      "title": "Force Field Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "MdRun",
+  "type": "object"
+}

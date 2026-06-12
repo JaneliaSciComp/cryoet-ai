@@ -1,0 +1,7 @@
+# id is derived from the folder name (run_001); not authored here.
+seed = 42
+sample_time = 100.0
+timestep = 0.002
+computer = "dgx-01"
+reference_contact = "Jane Researcher"
+force_field_version = "amber99sb-ildn"

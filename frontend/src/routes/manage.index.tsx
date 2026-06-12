@@ -5,12 +5,15 @@ import { CustomLink } from "~/components/CustomLink";
 import { ManageSection } from "~/components/manage/ManageSection";
 import { LastScanCard } from "~/components/manage/LastScanCard";
 import { SamplesWithWarningsTable } from "~/components/manage/SamplesWithWarningsTable";
+import { ScanRunWarningsTable } from "~/components/manage/ScanRunWarningsTable";
 import { ScanSamplesTable } from "~/components/manage/ScanSamplesTable";
 import {
   latestScanQueryOptions,
+  latestScanRunWarningsQueryOptions,
   latestScanSamplesQueryOptions,
   latestScanWarningsQueryOptions,
   useLatestScanQuery,
+  useLatestScanRunWarningsQuery,
   useLatestScanSamplesQuery,
   useLatestScanWarningsQuery,
 } from "~/utils/queryOptions";
@@ -20,6 +23,7 @@ export const Route = createFileRoute("/manage/")({
     Promise.all([
       queryClient.ensureQueryData(latestScanQueryOptions),
       queryClient.ensureQueryData(latestScanWarningsQueryOptions),
+      queryClient.ensureQueryData(latestScanRunWarningsQueryOptions),
       queryClient.ensureQueryData(latestScanSamplesQueryOptions("upserted")),
       queryClient.ensureQueryData(latestScanSamplesQueryOptions("skipped")),
       queryClient.ensureQueryData(latestScanSamplesQueryOptions("failed")),
@@ -29,9 +33,15 @@ export const Route = createFileRoute("/manage/")({
 
 // The four expandable sections, keyed so a single "Expand/Collapse all" control
 // can drive them together. All default to open.
-type SectionKey = "warnings" | "upserted" | "skipped" | "failed";
+type SectionKey =
+  | "warnings"
+  | "runWarnings"
+  | "upserted"
+  | "skipped"
+  | "failed";
 const SECTION_KEYS: SectionKey[] = [
   "warnings",
+  "runWarnings",
   "upserted",
   "skipped",
   "failed",
@@ -40,12 +50,14 @@ const SECTION_KEYS: SectionKey[] = [
 function ManageRoute() {
   const { data: latestScan } = useLatestScanQuery();
   const { data: warningGroups } = useLatestScanWarningsQuery();
+  const { data: runWarnings } = useLatestScanRunWarningsQuery();
   const { data: upserted } = useLatestScanSamplesQuery("upserted");
   const { data: skipped } = useLatestScanSamplesQuery("skipped");
   const { data: failed } = useLatestScanSamplesQuery("failed");
 
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
     warnings: true,
+    runWarnings: true,
     upserted: true,
     skipped: true,
     failed: true,
@@ -59,6 +71,7 @@ function ManageRoute() {
     const next = !allExpanded;
     setExpanded({
       warnings: next,
+      runWarnings: next,
       upserted: next,
       skipped: next,
       failed: next,
@@ -124,6 +137,15 @@ function ManageRoute() {
         onChange={setSection("warnings")}
       >
         <SamplesWithWarningsTable groups={warningGroups} />
+      </ManageSection>
+
+      <ManageSection
+        count={runWarnings.length}
+        title="Scan-level issues"
+        expanded={expanded.runWarnings}
+        onChange={setSection("runWarnings")}
+      >
+        <ScanRunWarningsTable warnings={runWarnings} />
       </ManageSection>
 
       <ManageSection

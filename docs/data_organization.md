@@ -18,7 +18,7 @@ Skipping the editor setup is fine — `pixi run validate {sample_dir}` (step 5) 
 
 ### 1. Lay out the sample directory
 
-Copy the starter directory that matches your data arm — `templates/sample_id_experimental/` for experimental cryoET data or `templates/sample_id_simulation/` for MD + synthetic cryoET data — into the `data/` directory. The starter directory contains empty directories to scaffold the correct directory structure. Then follow the naming instructions below.
+Copy the starter directory that matches your data arm — `templates/sample_id_experimental/` for experimental cryoET data or `templates/sample_id_simulation/` for MD + synthetic cryoET data — into the right top-level arm: experimental samples go under `Experimental/`, and simulation samples go under `MdSimulation/{Bulk|ChromatinFiber|SingleMolecule|Slab}/` (the subdirectory you choose sets the sample's `dataset_type`). The starter directory contains empty directories to scaffold the correct directory structure. Then follow the naming instructions below.
 
 Rename the top-level `sample_id_*` directory to the desired sample id.
 
@@ -36,7 +36,7 @@ gouauxlab_20250418_AMmilled29-2/
 
 ### 2. Fill out `{sample_id}/sample.toml`
 
-- Complete as many fields marked `<FILL IN>` as you can. For now, the only required fields are `sample.data_source` and `sample.project`.
+- Complete as many fields marked `<FILL IN>` as you can. For now, the only required authored field is `sample.project` (`sample.data_source` is set by the directory the sample lives under, not authored).
 - Delete the `[synapse]` block if your project is `chromatin`, or vice versa.
 - Optionally, uncomment and complete the `[[aunp]]`, `[freezing]`, and `[milling]` blocks.
 
@@ -89,43 +89,41 @@ python -m schema.validate {sample_dir}
 
 ## Directory structure
 
-### CryoET (experimental) data
+The data root has **two top-level arms**, and the arm a sample lives under is
+the source of truth for its `data_source` (and, for simulation, its
+`dataset_type`):
 
 ```
-{sample_id}/                                 # sample identity = directory name
-  sample.toml                                # sample-level conditions
-  {acquisition_id}/                          # acquisition identity = directory name
-    acquisition.toml                         # per-acquisition params + processing log
-    Frames/                                  # raw movie frames (.eer / .tiff) + .mdoc
-    Gains/                                   # gain reference
-    TiltSeries/                              # .mrc + .zarr + .rawtlt
-    Alignments/
-      {alignment_id}/                        # one subfolder per alignment run
-        *.json                               # machine-emitted alignment files
-    Reconstructions/
-      Tomograms/
-        {processing_id}/                     # one subfolder per processing pipeline
-          *.mrc
-          *.zarr
-      Annotations/
-        {annotation_id}/
-          *.star
-          *.mrc / *.zarr
+{data_root}/
+  Experimental/                              # data_source = experimental
+    {sample_id}/ ...
+  MdSimulation/                              # data_source = simulation
+    Bulk/            {sample_id}/ ...        # dataset_type = bulk
+    ChromatinFiber/  {sample_id}/ ...        # dataset_type = chromatin_fiber
+    SingleMolecule/  {sample_id}/ ...        # dataset_type = single_molecule
+    Slab/            {sample_id}/ ...        # dataset_type = slab
 ```
 
-### MD simulation (sample) and associated synthetic cryoET (acquisitions) data
+`data_source` is derived from the top-level directory (`Experimental` vs
+`MdSimulation`), and a simulation sample's `dataset_type` is derived from the
+`MdSimulation/<SubDir>/` it sits under — **neither is authored in
+`sample.toml`**. Any `data_source` left over in a legacy `sample.toml` is
+simply overridden by the directory.
+
+### CryoET (experimental) data — under `Experimental/`
 
 ```
-{sample_id}/
-  sample.toml                                # sample-level conditions + simulation params
-  MdRuns/                                    # simulation only: one subfolder per MD run
-    {md_run_id}/                             # name = [[md_run]].id in sample.toml
-      Trajectories/                          # raw simulation output
-      Snapshots/                             # extracted conformations (frames)
-  SyntheticCryoET/                           # wraps all synthetic-cryoET acquisitions for this sample
-    {acquisition_id}/                        # synthetic cryoET from one md_run frame
-      acquisition.toml                       # per-acquisition params + [md_source]
-      TiltSeries/
+Experimental/
+  {sample_id}/                               # sample identity = directory name
+    sample.toml                              # sample-level conditions
+    {acquisition_id}/                        # acquisition identity = directory name
+      acquisition.toml                       # per-acquisition params + processing log
+      Frames/                                # raw movie frames (.eer / .tiff) + .mdoc
+      Gains/                                 # gain reference
+      TiltSeries/                            # .mrc + .zarr + .rawtlt
+      Alignments/
+        {alignment_id}/                      # one subfolder per alignment run
+          *.json                             # machine-emitted alignment files
       Reconstructions/
         Tomograms/
           {processing_id}/                   # one subfolder per processing pipeline
@@ -137,7 +135,42 @@ python -m schema.validate {sample_dir}
             *.mrc / *.zarr
 ```
 
-For simulation samples, the raw MD data lives under `MdRuns/{md_run_id}/` — one subfolder per `[[md_run]]` block in `sample.toml`, holding that run's trajectories and extracted frames. Each acquisition is the synthetic cryoET generated from a single frame of one run; its directory sits inside `SyntheticCryoET/`, sibling to `MdRuns/`, and its `[md_source]` block records which `md_run_id` and `frame` it came from. The `md_run_id` must match one of the sample's `[[md_run]]` ids; both `[[md_run]]` and `[md_source]` are rejected on experimental samples.
+### MD simulation (sample) and associated synthetic cryoET (acquisitions) data — under `MdSimulation/<SubDir>/`
+
+```
+MdSimulation/{Bulk|ChromatinFiber|SingleMolecule|Slab}/
+  {sample_id}/
+    sample.toml                              # sample-level conditions
+    MdRuns/                                  # simulation only: one subfolder per MD run
+      {md_run_id}/                           # the folder name IS the run's id
+        md_run.toml                          # seed, sample_time, timestep, computer, …
+        Trajectories/                        # raw simulation output
+        Snapshots/                           # extracted conformations (frames)
+    SyntheticCryoET/                         # wraps all synthetic-cryoET acquisitions for this sample
+      {acquisition_id}/                      # synthetic cryoET from one md_run frame
+        acquisition.toml                     # per-acquisition params + [md_source]
+        TiltSeries/
+        Reconstructions/
+          Tomograms/
+            {processing_id}/                 # one subfolder per processing pipeline
+              *.mrc
+              *.zarr
+          Annotations/
+            {annotation_id}/
+              *.star
+              *.mrc / *.zarr
+```
+
+For simulation samples, the raw MD data lives under `MdRuns/{md_run_id}/` — one
+subfolder per MD run. Each run is described by its own `MdRuns/{id}/md_run.toml`
+file, and the **folder name is the run's identity** (`md_run_id`); there is no
+`id` field authored in the file. Each acquisition is the synthetic cryoET
+generated from a single frame of one run; its directory sits inside
+`SyntheticCryoET/`, sibling to `MdRuns/`, and its `[md_source]` block records
+which `md_run_id` and `frame` it came from. The `md_source.md_run_id` should
+match an `MdRuns/{id}/` folder name; a dangling reference warns rather than
+failing the acquisition. Both `MdRuns/{id}/md_run.toml` and `[md_source]` are
+relevant only to simulation samples and are rejected on experimental samples.
 
 The directory skeleton is adapted from the [CZI CryoET Data Portal](https://chanzuckerberg.github.io/cryoet-data-portal/stable/cryoet_data_portal_docsite_data.html) at the Sample > Acquisition > (Frames, Gains, TiltSeries, Alignments, Reconstructions) level, with three deliberate departures:
 
@@ -149,7 +182,10 @@ Simulation data uses a parallel structure with domain-appropriate folder names. 
 
 ### Example: mapping Gouaux lab data to this structure
 
+This experimental sample lives under the `Experimental/` top-level arm:
+
 ```
+Experimental/
 gouauxlab_20250418_AMmilled29-2/             # sample identity = directory name
   sample.toml                                # sample-level conditions
   Position_86/                               # acquisition identity = directory name
@@ -209,10 +245,15 @@ One file per sample, placed at the root of the sample directory. Contains only w
 
 One file per acquisition, placed at the root of each acquisition directory. It contains:
 
-1. Researcher-authored imaging parameters not available from MDOC files (nominal resolution, nominal tilt spacing, target defocus range, energy filter model, phase plate, microscope model).
-2. A **processing log**: a `[raw_tomogram]` table plus `[[post_processed_tomogram]]` and `[[annotation]]` entries appended over time as processing produces new outputs.
+1. Researcher-authored imaging parameters not available from MDOC files (nominal resolution, nominal tilt spacing, target defocus range, energy filter model, phase plate, microscope model, imaging `facility`).
+2. A **tilt-series quality score** (`tilt_series_quality_score`): an integer on a 1–5 rubric — **5** Excellent, **4** Good, **3** Fair, **2** Poor, **1** Low. (This replaces the former free-text `quality` field, which has been removed.)
+3. A **processing log**: a `[raw_tomogram]` table plus `[[post_processed_tomogram]]` and `[[annotation]]` entries appended over time as processing produces new outputs.
 
 The acquisition directory name *is* the acquisition's identity, so `acquisition.id` is omitted from the file.
+
+### `md_run.toml` — per-MD-run metadata (simulation samples only)
+
+One file per MD run, placed at the root of each `MdRuns/{id}/` directory. The run directory name *is* the run's identity (`md_run_id`), so no `id` field is authored. It records the run's `seed`, `sample_time`, `timestep`, `computer`, `reference_contact`, and `force_field_version`. (This replaces the deprecated `[[md_run]]` blocks in `sample.toml`.)
 
 ---
 
@@ -220,7 +261,7 @@ The acquisition directory name *is* the acquisition's identity, so `acquisition.
 
 ### Required fields
 
-Only three fields are required for all entries: `sample.lab_name`, `sample.data_source`, and `sample.project`. All other fields are optional, allowing the schema to grow as researcher needs settle. These three fields are also the only enums — all other fields are open text, with the potential to be tightened into enums later based on how researchers use them.
+The only required authored field is `sample.project`. `sample.data_source` is set by the top-level directory (`Experimental/` vs `MdSimulation/`) and `dataset_type` by the `MdSimulation/<SubDir>/` directory — both are derived, not authored. All other fields are optional, allowing the schema to grow as researcher needs settle. The schema enums are `data_source`, `dataset_type`, `project`, and `lab_name` (authored under `[sample]`; one of `collepardo`, `gouaux`, `rosen`, `villa`) — all other fields are open text, with the potential to be tightened into enums later based on how researchers use them.
 
 ### Folder naming rules
 

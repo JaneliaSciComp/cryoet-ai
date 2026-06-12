@@ -106,6 +106,14 @@ def client(tmp_path):
                 detected_at=_T_COMPLETED_END, scan_run_id="run-completed",
             ))
 
+        # Run-level (no-sample) warnings for the completed scan.
+        s.add(orm.ScanRunWarningsORM(
+            category="unknown_md_simulation_subdir",
+            location="/data/MdSimulation/NotADatasetType",
+            message="'NotADatasetType' is not a recognized dir",
+            detected_at=_T_COMPLETED_END, scan_run_id="run-completed",
+        ))
+
         # Per-sample membership for the completed scan.
         s.add(orm.ScanSamplesORM(
             scan_run_id="run-completed", sample_id="sample-2",
@@ -226,6 +234,40 @@ def test_latest_warnings_must_route_before_id(client):
     r = client.get("/scans/latest/warnings")
     assert r.status_code == 200
     assert isinstance(r.json(), list)
+
+
+# ── GET /scans/latest/run-warnings + /scans/{id}/run-warnings ──────────────
+
+
+def test_latest_run_warnings_returns_no_sample_warnings(client):
+    r = client.get("/scans/latest/run-warnings")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) == 1
+    w = body[0]
+    assert w["category"] == "unknown_md_simulation_subdir"
+    assert w["location"] == "/data/MdSimulation/NotADatasetType"
+    assert w["scan_run_id"] == "run-completed"
+    # No sample_id key — these warnings aren't tied to a sample.
+    assert "sample_id" not in w
+
+
+def test_latest_run_warnings_must_route_before_id(client):
+    # Regression: ``/latest/run-warnings`` must resolve before ``/{scan_run_id}``.
+    r = client.get("/scans/latest/run-warnings")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_run_warnings_by_id_empty_for_scan_without_any(client):
+    r = client.get("/scans/run-failed/run-warnings")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_run_warnings_by_id_404_for_unknown(client):
+    r = client.get("/scans/does-not-exist/run-warnings")
+    assert r.status_code == 404
 
 
 # ── GET /scans/latest/samples ─────────────────────────────────────────────
